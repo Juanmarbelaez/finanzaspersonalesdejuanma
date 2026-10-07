@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react'
 
 /*
  * Moneymaxxer, la mascota de Plata (diseño de Juanma). Una pose por estado real de la app.
- * Cada vez que aparece se plasma de abajo hacia arriba: primero una versión desenfocada
- * que sube con un borde suave y detrás la nítida, como si se enfocara.
+ * Cada vez que aparece llega desenfocado, sube un poco y se enfoca (ver .mascot en styles.css).
  */
 
 export type MascotPose = 'idle' | 'welcome' | 'thinking' | 'savings' | 'success' | 'celebrate' | 'warning' | 'empty' | 'pointing' | 'review'
@@ -55,9 +54,7 @@ export function Mascot({
   const src = `./moneymaxxer/${pose}.webp`
   return (
     <span ref={ref} className={`mascot ${className}`} style={{ width: size, height: size }}>
-      <img className="m-blur" src={src} width={size} height={size} alt="" aria-hidden draggable={false} decoding="async" />
       <img
-        className="m-sharp"
         src={src}
         width={size}
         height={size}
