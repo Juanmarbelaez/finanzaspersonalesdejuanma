@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 import { haptic } from '../lib/haptic'
 import { useStore } from '../store'
@@ -168,7 +168,7 @@ export function AccountCard({
 }) {
   const type = ACCOUNT_TYPE_LABEL[account.type]
   const cls = `acct-card ${big ? 'big' : ''} ${selected ? 'selected' : ''}`
-  const style = { '--c': account.color, '--fg': isLight(account.color) ? '#000' : '#fff' } as React.CSSProperties
+  const style = { '--c': account.color, '--fg': isLight(account.color) ? '#000' : '#fff' } as CSSProperties
   const inner = (
     <>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: selected && onClick ? 18 : 0 }}>
@@ -238,8 +238,14 @@ export function Segmented<T extends string>({
   options: { value: T; label: string }[]
   onChange(v: T): void
 }) {
+  const i = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  )
+  // El indicador de vidrio se desliza a la opción elegida (como el control de iOS)
   return (
-    <div className="segmented" role="tablist">
+    <div className="segmented" role="tablist" style={{ '--n': options.length, '--i': i } as CSSProperties}>
+      <span className="seg-thumb glass" aria-hidden />
       {options.map((o) => (
         <button
           key={o.value}

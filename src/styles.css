@@ -3567,3 +3567,192 @@ body::before {
 html {
   touch-action: pan-x pan-y;
 }
+
+/* Sin rebote al jalar arriba o abajo: se siente app, no página web */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* ======================================================================
+ * Liquid Glass (iOS 26): translúcido, borde de luz más fuerte arriba a la
+ * izquierda, brillo interior y sombra suave. Solo en lo que flota.
+ * ====================================================================== */
+
+:root {
+  --lg-bg: rgba(44, 44, 48, 0.42);
+  --lg-rim: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0.1) 32%,
+    rgba(255, 255, 255, 0) 55%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%);
+  --lg-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='light'] {
+  --lg-bg: rgba(255, 255, 255, 0.55);
+  --lg-rim: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 1),
+    rgba(255, 255, 255, 0.5) 35%,
+    rgba(0, 0, 0, 0.04) 60%,
+    rgba(255, 255, 255, 0.8) 100%
+  );
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%);
+  --lg-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.glass,
+.app-header .hbtn,
+.sheet-top .corner,
+.fab button:not(.primary),
+.ob-back {
+  position: relative;
+  isolation: isolate;
+  background: var(--lg-sheen), var(--lg-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  backdrop-filter: blur(18px) saturate(190%);
+  box-shadow: var(--lg-shadow);
+}
+
+/* Borde de luz: un aro de 1px pintado con degradado (no un borde plano) */
+.glass::before,
+.app-header .hbtn::before,
+.sheet-top .corner::before,
+.fab button:not(.primary)::before,
+.fab button.primary::before,
+.ob-back::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--lg-rim);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.fab button.primary {
+  position: relative;
+}
+
+/* Botones del header: círculos de vidrio */
+.app-header .hbtn {
+  width: 40px;
+  height: 40px;
+  opacity: 1;
+}
+
+.app-header .hbtn:active {
+  transform: scale(0.92);
+}
+
+/* Cerrar en las hojas: círculo de vidrio */
+.sheet-top .corner {
+  width: 32px;
+  height: 32px;
+  color: var(--text);
+}
+
+/* Control segmentado: el indicador de vidrio se desliza a la opción elegida */
+.segmented {
+  position: relative;
+}
+
+.segmented .seg-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / var(--n));
+  border-radius: 999px;
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform 0.42s var(--ease-spring);
+  z-index: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--lg-sheen), rgba(118, 118, 128, 0.42);
+}
+
+:root[data-theme='light'] .segmented .seg-thumb {
+  background: #fff;
+}
+
+.segmented button {
+  position: relative;
+  z-index: 1;
+}
+
+.segmented button.active {
+  background: none;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/* Botón principal en cápsula, como Bevel */
+.save-bar {
+  width: auto;
+  margin: 6px 16px calc(var(--safe-bottom) + 10px);
+  padding: 16px 0;
+  border-radius: 999px;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 60%), var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 24px -10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s var(--ease-spring);
+}
+
+.save-bar:active {
+  transform: scale(0.98);
+}
+
+.sheet-foot.edge {
+  background: var(--surface);
+}
+
+/* Avisos: vidrio */
+.toast::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--lg-rim);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* El vidrio no debe mover la X de su esquina ni encoger el botón de guardar */
+.sheet-top .corner {
+  position: absolute;
+}
+
+.sheet-foot {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-foot .save-bar {
+  align-self: stretch;
+}
+
+/* Barra de acciones flotante de las hojas (Editar · Ver movimientos): vidrio */
+.action-bar {
+  position: relative;
+  isolation: isolate;
+  background: var(--lg-sheen), var(--lg-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  backdrop-filter: blur(18px) saturate(190%);
+  box-shadow: var(--lg-shadow);
+}
