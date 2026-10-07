@@ -3,12 +3,15 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/montserrat/wght.css'
 import './styles.css'
 import { App } from './App'
+import { startOverscrollColor } from './lib/overscroll'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 )
+
+startOverscrollColor()
 
 // Funciona sin internet una vez instalada
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
