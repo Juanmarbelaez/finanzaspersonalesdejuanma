@@ -3277,3 +3277,238 @@ button.amount-big {
 .ob-brand b {
   font-weight: 600;
 }
+
+/* ======================================================================
+ * Versión web (computador): menú lateral, contenido ancho y hojas como ventanas
+ * ====================================================================== */
+
+@media (min-width: 960px) {
+  .app {
+    max-width: none;
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-areas:
+      'banner banner'
+      'side main';
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+
+  .demo-banner {
+    grid-area: banner;
+  }
+
+  .app.demo .sky {
+    border-radius: 0;
+  }
+
+  /* El header se vuelve menú lateral de vidrio */
+  .app-header {
+    grid-area: side;
+    top: 0;
+    height: 100dvh;
+    margin-top: 0 !important;
+    padding: 28px 14px 24px;
+    display: flex;
+    flex-direction: column;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+    box-shadow: inset -0.5px 0 0 var(--line);
+  }
+
+  .app-header::before,
+  .app-header::after {
+    display: none;
+  }
+
+  :root[data-theme='light'] .app-header {
+    --h-fg: #000;
+    --h-fg-2: rgba(0, 0, 0, 0.5);
+    --pill: rgba(255, 255, 255, 0.9);
+    --pill-rim: rgba(0, 0, 0, 0.06);
+    --pill-spec: #fff;
+    --pill-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  :root[data-theme='light'] .app-header .logo-mark .lm-white {
+    display: none;
+  }
+
+  :root[data-theme='light'] .app-header .logo-mark .lm-black {
+    display: block;
+  }
+
+  .app-header .title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+  }
+
+  .wordmark {
+    order: -1;
+    width: 100%;
+    text-align: left;
+    font-size: 20px;
+    margin-bottom: 18px;
+  }
+
+  .app-header .hbtn {
+    justify-self: auto;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 2px;
+    padding: 18px 0 0;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .tabs button {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+
+  .tabs button:hover:not(.active) {
+    background: var(--pill);
+    opacity: 0.8;
+  }
+
+  main {
+    grid-area: main;
+    min-width: 0;
+    width: 100%;
+    max-width: 1120px;
+    padding: 20px 40px 0;
+    justify-self: center;
+  }
+
+  .screen {
+    padding: 12px 0 140px;
+  }
+
+  /* Resumen en dos columnas; los carruseles ocupan todo el ancho */
+  .dash > .stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 28px;
+    align-items: start;
+  }
+
+  .dash > .stack > * + * {
+    margin-top: 0;
+  }
+
+  .dash > .stack > section:has(.rings),
+  .dash > .stack > section:has(.upcoming) {
+    grid-column: 1 / -1;
+  }
+
+  .rings,
+  .upcoming {
+    margin: 0;
+    padding-inline: 0;
+  }
+
+  /* Listas largas: no más anchas de lo que se lee cómodo */
+  .screen:not(.dash) {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* Hojas: ventana centrada en vez de subir desde abajo */
+  .sheet {
+    top: 50%;
+    bottom: auto;
+    width: 560px;
+    max-height: min(88dvh, 880px);
+    border-radius: 28px;
+    transform: translate(-50%, -50%);
+    animation: modal-in 0.38s var(--ease-sheet);
+    box-shadow: var(--float-shadow);
+  }
+
+  .sheet.closing {
+    animation: modal-out 0.2s var(--ease-in) forwards;
+  }
+
+  .sheet .sheet-top::before {
+    display: none;
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -46%) scale(0.97);
+    }
+  }
+
+  @keyframes modal-out {
+    to {
+      opacity: 0;
+      transform: translate(-50%, -48%) scale(0.98);
+    }
+  }
+
+  @supports (-webkit-mask-box-image: none) {
+    .sheet {
+      --sq: 28px;
+      -webkit-mask-box-image-outset: 0;
+    }
+  }
+
+  /* Sin el efecto de "pantalla que se encoge" de iPhone */
+  .app.pushed {
+    transform: none;
+    filter: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .fab {
+    right: 32px;
+    bottom: 28px;
+  }
+
+  .action-sheet {
+    bottom: auto;
+    top: 50%;
+    width: 380px;
+    transform: translate(-50%, -50%);
+    animation: modal-in 0.3s var(--ease-sheet);
+  }
+
+  .action-sheet.closing {
+    animation: modal-out 0.18s var(--ease-in) forwards;
+  }
+
+  .toast {
+    top: 20px;
+  }
+
+  /* Onboarding centrado como tarjeta */
+  .onboarding {
+    max-width: 480px;
+    min-height: auto;
+    margin: 6vh auto;
+    padding-top: 32px;
+  }
+
+  button,
+  .tx-row,
+  .card {
+    cursor: pointer;
+  }
+}
+
+@media (min-width: 960px) and (hover: hover) {
+  .tx-row:hover {
+    background: var(--tag-bg);
+  }
+}

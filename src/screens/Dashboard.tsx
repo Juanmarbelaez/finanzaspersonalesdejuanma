@@ -99,7 +99,7 @@ export function Dashboard() {
   const doneSteps = steps.filter((s) => s.done).length
 
   return (
-    <div className="screen">
+    <div className="screen dash">
       <div className="stack">
         <section className="card center" style={{ paddingBottom: 12 }}>
           {budget > 0 ? (

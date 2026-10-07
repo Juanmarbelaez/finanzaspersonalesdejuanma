@@ -37,6 +37,8 @@ function useDragToDismiss(
     }
 
     const begin = (y: number, x: number, target: EventTarget | null) => {
+      // En computador la hoja es una ventana centrada: se cierra con la X, Escape o afuera
+      if (matchMedia('(min-width: 960px)').matches) return
       const t = target as HTMLElement
       // Nunca robarle el gesto a un control o a un carrusel horizontal
       if (t.closest('input, textarea, select, .acct-scroll, .suggest, .keypad, .rings, .chart')) return

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Delete } from 'lucide-react'
 import { useStore } from '../store'
 import { currencyDecimals } from '../lib/format'
@@ -105,6 +105,21 @@ export function Keypad({ onKey, decimals, decimalSep }: { onKey(k: PadKey): void
     onKey(k)
   }
   const keys: PadKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', decimals ? 'dec' : '000', '0', 'del']
+
+  // En computador también se escribe con el teclado físico
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return
+      if (/^[0-9]$/.test(e.key)) onKey(e.key as PadKey)
+      else if (e.key === 'Backspace') onKey('del')
+      else if ((e.key === ',' || e.key === '.') && decimals) onKey('dec')
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onKey, decimals])
   return (
     <div className="keypad" role="group" aria-label="Teclado numérico">
       {keys.map((k) =>
