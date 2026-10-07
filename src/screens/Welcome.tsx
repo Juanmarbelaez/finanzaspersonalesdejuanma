@@ -9,6 +9,7 @@ import { explain, resetPassword, saveNow, signIn, signUp, useAuth } from '../lib
 import type { Account } from '../lib/types'
 import { Money } from '../components/ui'
 import { Mascot } from '../components/Mascot'
+import { Logo } from '../components/Logo'
 
 /*
  * Onboarding en 5 pasos, pensado con los principios de los videos:
@@ -216,6 +217,12 @@ export function Welcome() {
       {step === 'intro' && (
         <div className="ob-step" key="intro">
           <div className="ob-hero">
+            <div className="ob-brand">
+              <Logo size={30} onDark />
+              <span>
+                <b>Plata</b> de Juanma
+              </span>
+            </div>
             <Mascot pose="welcome" size={150} className="ob-mascot" />
             <h1 className="display">
               Tu plata,

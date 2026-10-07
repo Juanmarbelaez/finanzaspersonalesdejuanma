@@ -3159,3 +3159,58 @@ button.amount-big {
 .empty .mascot {
   margin: 0 auto;
 }
+
+/* ---------- Logo ---------- */
+
+.logo-mark {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.logo-mark img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.logo-mark .lm-black,
+:root[data-theme='light'] .logo-mark .lm-white {
+  display: none;
+}
+
+:root[data-theme='light'] .logo-mark .lm-black {
+  display: block;
+}
+
+/* Sobre el cielo verde o en la bienvenida siempre va blanco */
+.logo-mark.on-dark .lm-white,
+:root[data-theme='light'] .app-header:not(.scrolled) .logo-mark .lm-white {
+  display: block;
+}
+
+.logo-mark.on-dark .lm-black,
+:root[data-theme='light'] .app-header:not(.scrolled) .logo-mark .lm-black {
+  display: none;
+}
+
+/* En línea (no flex) para que se conserve el espacio entre "Plata" y "de Juanma" */
+.wm-logo {
+  vertical-align: -4px;
+  margin-right: 7px;
+}
+
+.ob-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 17px;
+  font-weight: 400;
+  color: #fff;
+}
+
+.ob-brand b {
+  font-weight: 600;
+}

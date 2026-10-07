@@ -13,6 +13,7 @@ import { Welcome } from './screens/Welcome'
 import { SheetHost } from './sheets/SheetHost'
 import { DialogHost, ask } from './components/Dialog'
 import { startCloud } from './lib/cloud'
+import { Logo } from './components/Logo'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
   dashboard: Dashboard,
@@ -222,6 +223,7 @@ export function App() {
               <Settings2 size={21} />
             </button>
             <h1 className="wordmark">
+              <Logo size={24} className="wm-logo" />
               <b>Plata</b>
               {name ? ` de ${name}` : ''}
               <i>.</i>
