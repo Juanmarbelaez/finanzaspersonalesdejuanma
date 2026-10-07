@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
 import { haptic } from '../lib/haptic'
@@ -74,7 +75,7 @@ export function DialogHost() {
   if (!req) return null
   const state = closing ? 'closing' : ''
 
-  return (
+  return createPortal(
     <>
       <div className={`dialog-backdrop ${state}`} onClick={() => finish(false)} />
       {req.kind === 'sheet' ? (
@@ -119,6 +120,7 @@ export function DialogHost() {
           </button>
         </div>
       )}
-    </>
+    </>,
+    document.body,
   )
 }

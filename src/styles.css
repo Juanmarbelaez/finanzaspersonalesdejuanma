@@ -4075,3 +4075,153 @@ label,
   vertical-align: -3px;
   color: var(--accent-ink);
 }
+
+/* ======================================================================
+ * Hojas: la pantalla de atrás se funde con el fondo y el vidrio se pule
+ * ====================================================================== */
+
+/* Detrás de la hoja: los bordes de la pantalla encogida se desvanecen hacia el negro */
+.backdrop {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.92) 0, rgba(0, 0, 0, 0) 140px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0, rgba(0, 0, 0, 0) 34px, rgba(0, 0, 0, 0) calc(100% - 34px), rgba(0, 0, 0, 0.9) 100%),
+    radial-gradient(130% 85% at 50% 40%, rgba(0, 0, 0, 0.38) 45%, rgba(0, 0, 0, 0.82) 100%);
+}
+
+:root[data-theme='light'] .backdrop {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0, rgba(0, 0, 0, 0) 140px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0, rgba(0, 0, 0, 0) 34px, rgba(0, 0, 0, 0) calc(100% - 34px), rgba(0, 0, 0, 0.6) 100%),
+    radial-gradient(130% 85% at 50% 40%, rgba(0, 0, 0, 0.22) 45%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Borde de arriba de la hoja con luz fina, y manija de vidrio */
+.sheet {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 18px 24px -20px rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='light'] .sheet {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.sheet-top::before {
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='light'] .sheet-top::before {
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: none;
+}
+
+/* Indicador del control segmentado: vidrio claro con brillo y borde de luz */
+.segmented .seg-thumb {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.1));
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.25),
+    0 6px 14px -6px rgba(0, 0, 0, 0.6),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='light'] .segmented .seg-thumb {
+  background: linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.85));
+  box-shadow:
+    inset 0 1px 0.5px #fff,
+    0 4px 12px -4px rgba(0, 0, 0, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.segmented {
+  background: rgba(118, 118, 128, 0.2);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme='light'] .segmented {
+  background: rgba(118, 118, 128, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Teclas: vidrio sutil con luz arriba y grosor abajo; crecen un poco al tocarlas */
+.keypad .key {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.05));
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.35s var(--ease-spring),
+    background 0.15s ease;
+}
+
+.keypad .key.fn {
+  background: none;
+  box-shadow: none;
+}
+
+.keypad .key:active {
+  transform: scale(1.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+  transition-duration: 0.08s;
+}
+
+:root[data-theme='light'] .keypad .key {
+  background: linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.86));
+  box-shadow:
+    inset 0 1px 0.5px #fff,
+    inset 0 -1px 1px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme='light'] .keypad .key:active {
+  background: #e8e8ea;
+}
+
+:root[data-theme='light'] .keypad,
+:root[data-theme='light'] .sheet-foot.edge {
+  background: #ececee;
+}
+
+/*
+ * Lente de las pestañas: vidrio dibujado (sin backdrop-filter) para que el desvanecido
+ * de la fila no la recorte en iPhone. Espacio arriba y abajo para que al levantarse no se corte.
+ */
+.tabs {
+  padding-top: 10px;
+  padding-bottom: 6px;
+  margin-top: 2px;
+}
+
+.tabs .tab-lens,
+html.lg-refract .tabs .tab-lens {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.22),
+    0 6px 16px -6px rgba(0, 0, 0, 0.45);
+}
+
+.app-header.scrolled .tabs .tab-lens {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07));
+}
+
+:root[data-theme='light'] .app-header.scrolled .tabs .tab-lens {
+  background: linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.85));
+  box-shadow:
+    inset 0 1px 0.5px #fff,
+    0 4px 12px -4px rgba(0, 0, 0, 0.18),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+
+/* Mientras se arrastra, más clara: se nota que la estás moviendo */
+.tabs.lens-drag .tab-lens {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12));
+}

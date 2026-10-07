@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useUI } from '../store'
 import { SheetCtx, useSheetEffects } from '../components/Sheet'
 import { TransactionSheet } from './TransactionSheet'
@@ -50,13 +51,15 @@ export function SheetHost() {
     close,
   )
 
-  return (
+  // Fuera del contenedor de scroll: en iPhone, una hoja dentro de él puede quedar recortada abajo
+  return createPortal(
     <>
       {sheets.map((s, i) => (
         <div key={s.key} style={{ position: 'relative', zIndex: 40 + i }}>
           <SheetCtx.Provider value={{ closing: !!s.closing, index: i }}>{render(s)}</SheetCtx.Provider>
         </div>
       ))}
-    </>
+    </>,
+    document.body,
   )
 }

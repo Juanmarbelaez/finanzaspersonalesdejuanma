@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react'
 import { Check, FileUp, Plus, Settings2, SlidersHorizontal, X } from 'lucide-react'
 import { TABS, useStore, useUI, type Tab } from './store'
@@ -123,8 +124,9 @@ function TabPills() {
       const id = over
       over = null
       setHover(null)
+      // Siempre vuelve a una pestaña (aunque sueltes sobre la misma en la que estabas)
       if (id) setTab(id)
-      else place(nav.querySelector<HTMLElement>('button.active'))
+      place(nav.querySelector<HTMLElement>(`button[data-tab="${id ?? useUI.getState().tab}"]`))
       // El clic que llega después de soltar no debe repetir la acción
       const stop = (ev: Event) => {
         ev.stopPropagation()
@@ -201,7 +203,7 @@ function Fab() {
 function Toast() {
   const { message, action, n, hide } = useToast()
   if (!message) return null
-  return (
+  return createPortal(
     <div className="toast" role="status" key={n}>
       <span className="toast-dot" aria-hidden>
         <Check size={13} strokeWidth={3.2} />
@@ -219,7 +221,8 @@ function Toast() {
           {action.label}
         </button>
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
 
