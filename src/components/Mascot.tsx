@@ -34,21 +34,27 @@ export function Mascot({
 }) {
   const ref = useRef<HTMLSpanElement>(null)
 
-  // Se plasma cuando entra en pantalla: si está más abajo, espera a que lo veas
+  // Arranca solo cuando la imagen ya está lista y a la vista: nunca "aparece de una"
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    const img = el?.querySelector('img')
+    if (!el || !img) return
     el.classList.remove('play')
+    let alive = true
+    const ready = img.decode ? img.decode().catch(() => undefined) : Promise.resolve()
     const io = new IntersectionObserver(
       (entries) => {
         if (!entries.some((e) => e.isIntersecting)) return
         io.disconnect()
-        el.classList.add('play')
+        ready.then(() => alive && requestAnimationFrame(() => el.classList.add('play')))
       },
       { threshold: 0.3 },
     )
     io.observe(el)
-    return () => io.disconnect()
+    return () => {
+      alive = false
+      io.disconnect()
+    }
   }, [pose])
 
   const src = `./moneymaxxer/${pose}.webp`
@@ -61,7 +67,7 @@ export function Mascot({
         alt={decorative ? '' : ALT[pose]}
         aria-hidden={decorative || undefined}
         draggable={false}
-        decoding="async"
+        loading="eager"
       />
     </span>
   )

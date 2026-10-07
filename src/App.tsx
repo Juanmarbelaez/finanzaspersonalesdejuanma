@@ -13,6 +13,7 @@ import { Welcome } from './screens/Welcome'
 import { SheetHost } from './sheets/SheetHost'
 import { DialogHost, ask } from './components/Dialog'
 import { startCloud } from './lib/cloud'
+import { scroller } from './lib/scroller'
 import { Logo } from './components/Logo'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
@@ -165,7 +166,7 @@ export function App() {
 
   // Efecto de hoja de iOS: la pantalla de atrás se encoge desde lo que estás viendo
   useLayoutEffect(() => {
-    if (sheetOpen && appRef.current) appRef.current.style.transformOrigin = `50% ${window.scrollY + 40}px`
+    if (sheetOpen && appRef.current) appRef.current.style.transformOrigin = `50% ${scroller().scrollTop + 40}px`
   }, [sheetOpen])
 
   useEffect(() => {
@@ -181,7 +182,7 @@ export function App() {
   }, [onboarded])
 
   useEffect(() => {
-    window.scrollTo({ top: 0 })
+    scroller().scrollTo({ top: 0 })
   }, [tab])
 
   if (!onboarded)

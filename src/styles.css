@@ -486,13 +486,24 @@ textarea {
 
 .screen {
   padding: 16px 16px calc(var(--safe-bottom) + 112px);
-  animation: enter 0.35s var(--ease);
+  animation: enter 0.26s ease-out;
 }
 
+/* Cambio de pestaña limpio: aparece con un desenfoque sutil, sin moverse */
 @keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
   }
 }
 
@@ -3172,11 +3183,11 @@ button.amount-big {
 }
 
 .mascot.play img {
-  animation: mascot-in 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: mascot-in 1.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 .mascot.play::after {
-  animation: mascot-shadow 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: mascot-shadow 1.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 .mascot.play::before {
@@ -3828,4 +3839,32 @@ body {
   border: 3px solid var(--surface-3);
   border-top-color: var(--text);
   animation: spin 0.9s linear infinite;
+}
+
+/* ---------- La app hace scroll en su propio contenedor (sin rebote ni barra) ---------- */
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+
+#root::-webkit-scrollbar {
+  display: none;
+}
+
+/* Con el teclado abierto, el botón de seguir queda encima del teclado (como Uber) */
+.onboarding .ob-actions {
+  padding-bottom: var(--kb, 0px);
+  transition: padding-bottom 0.25s var(--ease-sheet);
 }

@@ -4,6 +4,7 @@ import { useStore } from './store'
 import { formatMoney, type MoneyOpts } from './lib/format'
 import type { Account, Category } from './lib/types'
 import { currentMonth, todayISO } from './lib/dates'
+import { scroller } from './lib/scroller'
 import { inMonth, totalBudget, totals } from './lib/selectors'
 import { expectedCurve, fixedSchedule, paceStatus, type PaceStatus } from './lib/pace'
 
@@ -110,19 +111,20 @@ export function useMonthMood(): PaceStatus {
 
 /** El header pasa a vidrio cuando el contenido empieza a pasar por debajo. */
 export function useScrolled(threshold = 4): boolean {
-  const [scrolled, setScrolled] = useState(() => typeof window !== 'undefined' && window.scrollY > threshold)
+  const [scrolled, setScrolled] = useState(() => typeof document !== 'undefined' && scroller().scrollTop > threshold)
   useEffect(() => {
     let raf = 0
     const on = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
-        setScrolled(window.scrollY > threshold)
+        setScrolled(scroller().scrollTop > threshold)
       })
     }
-    window.addEventListener('scroll', on, { passive: true })
+    const el = scroller()
+    el.addEventListener('scroll', on, { passive: true })
     return () => {
-      window.removeEventListener('scroll', on)
+      el.removeEventListener('scroll', on)
       cancelAnimationFrame(raf)
     }
   }, [threshold])

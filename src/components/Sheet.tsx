@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { useUI } from '../store'
+import { scroller } from '../lib/scroller'
 
 /** Lo que la pila de hojas le cuenta a cada hoja: si se está cerrando y su posición. */
 export const SheetCtx = createContext<{ closing: boolean; index: number }>({ closing: false, index: 0 })
@@ -186,31 +187,20 @@ export function Sheet({
   )
 }
 
-/**
- * Con hojas abiertas: congela la página de atrás (en iOS `overflow: hidden` no basta,
- * hay que fijar el body y recordar el scroll) y cierra la de arriba con Escape.
- */
+/** Con hojas abiertas: congela el scroll de atrás y cierra la de arriba con Escape. */
 export function useSheetEffects(open: boolean, close: () => void) {
   useEffect(() => {
     if (!open) return
-    const y = window.scrollY
-    const b = document.body
-    b.classList.add('locked')
-    b.style.position = 'fixed'
-    b.style.top = `-${y}px`
-    b.style.left = '0'
-    b.style.right = '0'
+    const el = scroller()
+    document.body.classList.add('locked')
+    el.style.overflow = 'hidden'
     root().style.setProperty('--push', '1')
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('keydown', onKey)
-      b.classList.remove('locked')
-      b.style.position = ''
-      b.style.top = ''
-      b.style.left = ''
-      b.style.right = ''
-      window.scrollTo(0, y)
+      document.body.classList.remove('locked')
+      el.style.overflow = ''
     }
   }, [open, close])
 }
