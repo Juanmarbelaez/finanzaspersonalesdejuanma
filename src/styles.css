@@ -275,7 +275,16 @@ textarea {
   --sky-glow: color-mix(in srgb, var(--mood-light) 20%, transparent);
   background:
     radial-gradient(80% 32% at 50% 40%, var(--sky-glow) 0%, transparent 100%),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 40%, transparent 100%);
+    linear-gradient(
+      180deg,
+      var(--sky-top) 0%,
+      var(--sky-top) 6%,
+      color-mix(in srgb, var(--sky-top) 88%, var(--sky-mid)) 16%,
+      color-mix(in srgb, var(--sky-top) 55%, var(--sky-mid)) 28%,
+      var(--sky-mid) 44%,
+      color-mix(in srgb, var(--sky-mid) 45%, transparent) 70%,
+      transparent 100%
+    );
 }
 
 :root[data-theme='light'] .sky {
@@ -3546,10 +3555,15 @@ body::before {
   inset: -50vh 0;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(to bottom, var(--ovs-top) 50%, var(--bg) 50%);
+  background: linear-gradient(to bottom, var(--ovs-top) 0%, var(--ovs-top) 30%, var(--bg) 70%);
 }
 
 .app,
 .onboarding {
   background-color: var(--bg);
+}
+
+/* Como app nativa: sin zoom con pellizco (la app no se encoge ni se ve recortada) */
+html {
+  touch-action: pan-x pan-y;
 }
