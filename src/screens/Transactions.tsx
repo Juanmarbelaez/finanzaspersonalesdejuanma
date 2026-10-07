@@ -6,7 +6,7 @@ import { dayLabel, monthKey, monthLabel } from '../lib/dates'
 import { normalizeMerchant } from '../lib/rules'
 import { TxRow } from '../components/TxRow'
 import { Empty, Money } from '../components/ui'
-import { ArtCheck, ArtReceipt } from '../components/Art'
+import { Mascot } from '../components/Mascot'
 
 const PAGE = 120
 
@@ -105,19 +105,19 @@ export function Transactions() {
       {shown.length === 0 ? (
         filters.review ? (
           <Empty
-            art={<ArtCheck />}
+            art={<Mascot pose="review" size={170} className="enter" />}
             title="Todo revisado"
             text="Lo que importes o se cobre solo (recurrentes) aparece aquí para que lo confirmes."
           />
         ) : q || chips.length ? (
-          <Empty art={<ArtReceipt />} title="Nada por aquí" text="No hay movimientos con esa búsqueda o filtro.">
+          <Empty art={<Mascot pose="thinking" size={150} />} title="Nada por aquí" text="No hay movimientos con esa búsqueda o filtro.">
             <button className="btn small" onClick={() => (setQuery(''), setFilters(NO_FILTERS))}>
               Limpiar filtros
             </button>
           </Empty>
         ) : (
           <Empty
-            art={<ArtReceipt />}
+            art={<Mascot pose="empty" size={170} className="enter" />}
             title="Tu primer movimiento"
             text="Registra un gasto con el botón + o importa el extracto de tu banco en CSV."
           >

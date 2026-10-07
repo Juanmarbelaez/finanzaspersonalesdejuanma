@@ -6,7 +6,7 @@ import { currentMonth, monthKey } from '../lib/dates'
 import { FREQUENCY_LABEL, monthlyEquivalent } from '../lib/recurring'
 import type { Recurring } from '../lib/types'
 import { Empty, Money, Ring } from '../components/ui'
-import { ArtCalendar } from '../components/Art'
+import { Mascot } from '../components/Mascot'
 
 export function Recurrings() {
   const recurrings = useStore((s) => s.recurrings)
@@ -65,7 +65,7 @@ export function Recurrings() {
     return (
       <div className="screen">
         <Empty
-          art={<ArtCalendar />}
+          art={<Mascot pose="pointing" size={170} className="enter" />}
           title="Tus pagos fijos"
           text="Agrega arriendo, servicios y suscripciones. Se anotan solos el día del cobro y te quedan por revisar."
         >

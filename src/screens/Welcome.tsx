@@ -8,6 +8,7 @@ import { uid } from '../lib/id'
 import { explain, resetPassword, saveNow, signIn, signUp, useAuth } from '../lib/cloud'
 import type { Account } from '../lib/types'
 import { Money } from '../components/ui'
+import { Mascot } from '../components/Mascot'
 
 /*
  * Onboarding en 5 pasos, pensado con los principios de los videos:
@@ -215,10 +216,7 @@ export function Welcome() {
       {step === 'intro' && (
         <div className="ob-step" key="intro">
           <div className="ob-hero">
-            {/* Aquí va el logo de Juanma cuando lo tenga */}
-            <div className="logo" aria-hidden>
-              P
-            </div>
+            <Mascot pose="welcome" size={150} className="ob-mascot enter" />
             <h1 className="display">
               Tu plata,
               <br />
@@ -363,9 +361,7 @@ export function Welcome() {
 
       {step === 'confirm' && (
         <div className="ob-step" key="confirm">
-          <div className="ob-done-mark">
-            <Check size={34} strokeWidth={2.6} />
-          </div>
+          <Mascot pose="pointing" size={180} className="ob-mascot center enter" />
           <h2 className="ob-title center">Revisa tu correo</h2>
           <p className="ob-sub center">
             Te mandamos un enlace a <b>{email.trim()}</b>. Ábrelo desde este iPhone y vuelve aquí para entrar.
@@ -462,11 +458,7 @@ export function Welcome() {
 
       {step === 'done' && (
         <div className="ob-step" key="done">
-          <div className="ob-done-mark big">
-            <svg viewBox="0 0 52 52" aria-hidden>
-              <path d="M14 27l8 8 16-18" />
-            </svg>
-          </div>
+          <Mascot pose="celebrate" size={220} className="ob-mascot center enter" />
           <h2 className="ob-title center">Listo{displayName ? `, ${displayName}` : ''}.</h2>
           <p className="ob-sub center">Tu plata ya está guardada en tu cuenta. Anota tu primer gasto y mira cómo va el mes.</p>
           {isIOS() && !isStandalone() && (
