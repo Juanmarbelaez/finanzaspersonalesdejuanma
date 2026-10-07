@@ -1,18 +1,21 @@
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { CircleCheck, Plus, Target, TriangleAlert } from 'lucide-react'
 import { useStore, useUI } from '../store'
 import { useLocale, toast } from '../hooks'
-import { currentMonth, daysInMonth, monthKey, monthLabel, todayISO } from '../lib/dates'
+import { addMonths, currentMonth, daysInMonth, monthKey, monthLabel, todayISO } from '../lib/dates'
 import { categoryHistory } from '../lib/selectors'
 import { expectedCurve, fixedSchedule, projectMonth } from '../lib/pace'
 import { FALLBACK_CATEGORY } from '../lib/seed'
 import { uid } from '../lib/id'
 import type { Category } from '../lib/types'
 import { Sheet } from '../components/Sheet'
-import { AmountField } from '../components/AmountField'
+import { AmountDisplay, Keypad, useAmount } from '../components/Keypad'
+import { haptic } from '../lib/haptic'
 import { MonthBars } from '../components/charts'
 import { TxRow } from '../components/TxRow'
 import { Money, Segmented, statusColor, statusOf } from '../components/ui'
+
+const ICON = { flexShrink: 0, marginTop: 2 }
 
 /* ---------------- Detalle de categoría ---------------- */
 
@@ -47,7 +50,7 @@ export function CategorySheet({ id }: { id: string }) {
   // Meses completos del año para el promedio (el mes en curso distorsiona)
   const fullMonths = isCurrent ? Number(month.slice(5, 7)) - 1 : Number(month.slice(5, 7))
   const avg = fullMonths > 0 ? (yearTotal - (isCurrent ? spent : 0)) / fullMonths : 0
-  // Proyección honesta: fijos completos + lo variable al ritmo que llevas
+  // Proyección al cierre: fijos completos + lo variable al ritmo que llevas
   const projected = isCurrent && day > 3 && category.kind === 'expense' ? projectMonth(spent, fixed, day) : null
   const recs = recurrings.filter((r) => r.categoryId === id)
 
@@ -82,26 +85,41 @@ export function CategorySheet({ id }: { id: string }) {
         </div>
         {budget ? (
           <div className="caption" style={{ color: statusColor(st), marginTop: 4 }}>
-            <Money value={Math.abs(budget - spent)} /> {spent > budget ? 'de más' : 'libres'} de <Money value={budget} />
+            <Money value={Math.abs(budget - spent)} /> {spent > budget ? 'de más' : 'quedan'} de <Money value={budget} />
           </div>
         ) : null}
       </div>
 
       {projected !== null && budget ? (
         <div className={`note ${spent > budget || projected > budget ? 'warn' : 'good'}`} style={{ marginTop: 18 }}>
-          <span style={{ letterSpacing: 0 }}>{spent > budget || projected > budget ? '⚠️' : '✅'}</span>
+          {spent > budget || projected > budget ? <TriangleAlert size={18} style={ICON} /> : <CircleCheck size={18} style={ICON} />}
           {spent > budget ? (
             <span>
-              Ya te pasaste por <b><Money value={spent - budget} /></b>. Lo que gastes en {category.name.toLowerCase()} de aquí a fin de mes suma a eso: si puedes, frénala hasta el 1.
+              Ya te pasaste por{' '}
+              <b>
+                <Money value={spent - budget} />
+              </b>
+              . Lo que gastes en {category.name.toLowerCase()} hasta fin de mes se suma. Si puedes, frena hasta el 1.
             </span>
           ) : projected > budget ? (
             <span>
-              A este ritmo cierras en <b>≈<Money value={Math.round(projected / 1000) * 1000} /></b>. Para no pasarte: máximo{' '}
-              <b><Money value={(budget - spent) / (dim - day + 1)} /></b> por día los {dim - day + 1} días que quedan.
+              A este ritmo cierras en{' '}
+              <b>
+                ≈<Money value={Math.round(projected / 1000) * 1000} />
+              </b>
+              . Para no pasarte: máximo{' '}
+              <b>
+                <Money value={(budget - spent) / (dim - day + 1)} />
+              </b>{' '}
+              por día los {dim - day + 1} días que quedan.
             </span>
           ) : (
             <span>
-              A este ritmo cierras en <b>≈<Money value={Math.round(projected / 1000) * 1000} /></b>, <Money value={budget - projected} /> por debajo. Vas bien.
+              A este ritmo cierras en{' '}
+              <b>
+                ≈<Money value={Math.round(projected / 1000) * 1000} />
+              </b>
+              , <Money value={budget - projected} /> por debajo. Vas bien.
             </span>
           )}
         </div>
@@ -109,9 +127,13 @@ export function CategorySheet({ id }: { id: string }) {
 
       {!isCurrent && budget && spent <= budget && spent > 0 ? (
         <div className="note good celebrate" style={{ marginTop: 18 }}>
-          <span style={{ fontSize: 22, letterSpacing: 0 }}>🎯</span>
+          <Target size={22} style={{ flexShrink: 0 }} />
           <span>
-            Cerraste {monthLabel(month, locale).toLowerCase()} <b><Money value={budget - spent} /></b> por debajo del presupuesto.
+            Cerraste {monthLabel(month, locale).toLowerCase()}{' '}
+            <b>
+              <Money value={budget - spent} />
+            </b>{' '}
+            por debajo del presupuesto.
           </span>
         </div>
       ) : null}
@@ -169,14 +191,60 @@ export function CategorySheet({ id }: { id: string }) {
 /* ---------------- Crear / editar categoría ---------------- */
 
 const EMOJIS = [
-  '🛒', '🍔', '☕', '🍺', '🍕', '🥗', '🚗', '⛽', '🚌', '🏍️', '🏠', '💡', '📱', '💻', '🛍️', '👕',
-  '💪', '🏋️', '💊', '🩺', '🎬', '🎮', '🎵', '✈️', '🏖️', '📚', '🎓', '🎁', '🐶', '👶', '💇', '🧾',
-  '💳', '🏦', '💼', '💸', '📈', '🪙', '🎉', '🛠️', '❤️', '💍', '🧴', '🧹', '📦', '🌱', '⚽', '🍷',
+  '🛒',
+  '🍔',
+  '☕',
+  '🍺',
+  '🍕',
+  '🥗',
+  '🚗',
+  '⛽',
+  '🚌',
+  '🏍️',
+  '🏠',
+  '💡',
+  '📱',
+  '💻',
+  '🛍️',
+  '👕',
+  '💪',
+  '🏋️',
+  '💊',
+  '🩺',
+  '🎬',
+  '🎮',
+  '🎵',
+  '✈️',
+  '🏖️',
+  '📚',
+  '🎓',
+  '🎁',
+  '🐶',
+  '👶',
+  '💇',
+  '🧾',
+  '💳',
+  '🏦',
+  '💼',
+  '💸',
+  '📈',
+  '🪙',
+  '🎉',
+  '🛠️',
+  '❤️',
+  '💍',
+  '🧴',
+  '🧹',
+  '📦',
+  '🌱',
+  '⚽',
+  '🍷',
 ]
 
 export function CategoryEditSheet({ id, kind: presetKind }: { id?: string; kind?: 'expense' | 'income' }) {
   const existing = useStore((s) => (id ? s.categories.find((c) => c.id === id) : undefined))
   const count = useStore((s) => (id ? s.transactions.filter((t) => t.categoryId === id).length : 0))
+  const transactions = useStore((s) => s.transactions)
   const { upsertCategory, deleteCategory } = useStore.getState()
   const { closeSheet, closeAll } = useUI.getState()
 
@@ -184,44 +252,65 @@ export function CategoryEditSheet({ id, kind: presetKind }: { id?: string; kind?
   const [emoji, setEmoji] = useState(existing?.emoji ?? '🧾')
   const [pickEmoji, setPickEmoji] = useState(!existing)
   const [name, setName] = useState(existing?.name ?? '')
-  const [budget, setBudget] = useState<number | null>(existing?.budget ?? null)
+  const budget = useAmount(existing?.budget ?? null)
+  const [pad, setPad] = useState(false)
+  const [error, setError] = useState<{ msg: string; n: number } | null>(null)
 
-  const canSave = name.trim().length > 0
   const isFallback = id === FALLBACK_CATEGORY.expense || id === FALLBACK_CATEGORY.income
 
+  // Anticipar: el promedio de los últimos 3 meses completos como presupuesto sugerido
+  const suggested = useMemo(() => {
+    if (!existing || existing.kind !== 'expense') return null
+    const months = [1, 2, 3].map((i) => addMonths(currentMonth(), -i))
+    const total = transactions.reduce(
+      (s, t) => (t.categoryId === existing.id && t.type === 'expense' && months.includes(monthKey(t.date)) ? s + t.amount : s),
+      0,
+    )
+    const avg = Math.round(total / 3 / 1000) * 1000
+    return avg > 0 ? avg : null
+  }, [existing, transactions])
+
   const save = () => {
-    if (!canSave) return
+    if (!name.trim()) {
+      haptic()
+      setPad(false)
+      return setError((e) => ({ msg: 'Ponle un nombre a la categoría', n: (e?.n ?? 0) + 1 }))
+    }
+    haptic()
     const c: Category = {
       id: existing?.id ?? uid(),
       name: name.trim(),
       emoji,
       color: existing?.color ?? '#4CA626',
       kind,
-      budget: kind === 'expense' && budget ? budget : null,
+      budget: kind === 'expense' && budget.value ? budget.value : null,
     }
     upsertCategory(c)
     toast(existing ? 'Categoría actualizada' : 'Categoría creada')
     closeSheet()
   }
 
+  // No se pierde nada (los movimientos pasan a Otros), así que no se pregunta: se puede deshacer
   const remove = () => {
     if (!existing) return
-    const msg = count
-      ? `Sus ${count} movimientos pasan a "${kind === 'income' ? 'Otros ingresos' : 'Otros'}". ¿Borrar ${existing.name}?`
-      : `¿Borrar ${existing.name}?`
-    if (!confirm(msg)) return
-    deleteCategory(existing.id)
-    toast('Categoría borrada')
+    const undo = deleteCategory(existing.id)
     closeAll()
+    toast(count ? `Borrada · ${count} movimientos a ${kind === 'income' ? 'Otros ingresos' : 'Otros'}` : 'Categoría borrada', {
+      label: 'Deshacer',
+      run: undo,
+    })
   }
 
   return (
     <Sheet
       title={existing ? 'Editar categoría' : 'Nueva categoría'}
       footer={
-        <button className="save-bar" onClick={save} disabled={!canSave}>
-          Guardar
-        </button>
+        <>
+          {pad && kind === 'expense' && <Keypad onKey={budget.press} decimals={budget.decimals} decimalSep={budget.decimalSep} />}
+          <button className="save-bar" onClick={save}>
+            Guardar
+          </button>
+        </>
       }
       footerBar
     >
@@ -259,21 +348,52 @@ export function CategoryEditSheet({ id, kind: presetKind }: { id?: string; kind?
       )}
 
       <input
-        className="big-input"
+        key={error?.n}
+        className={`big-input ${error ? 'shake' : ''}`}
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(e) => {
+          setName(e.target.value)
+          setError(null)
+        }}
+        onFocus={() => setPad(false)}
         placeholder="Nombre de la categoría"
         aria-label="Nombre de la categoría"
         style={{ marginTop: 8 }}
       />
+      {error && (
+        <p className="caption neg" style={{ textAlign: 'center', margin: '2px 0 0' }}>
+          {error.msg}
+        </p>
+      )}
 
       {kind === 'expense' && (
-        <>
-          <AmountField value={budget} onChange={setBudget} variant="big" placeholder="0" ariaLabel="Presupuesto mensual" />
-          <p className="caption" style={{ textAlign: 'center', margin: '6px 0 0' }}>
-            Presupuesto mensual. Déjalo en 0 si no quieres límite.
-          </p>
-        </>
+        <div style={{ textAlign: 'center', marginTop: 10 }}>
+          <div className="eyebrow gray">Presupuesto mensual</div>
+          <AmountDisplay
+            display={budget.display}
+            empty={budget.empty}
+            active={pad}
+            onActivate={() => setPad(true)}
+            label="Presupuesto mensual"
+          />
+          {suggested && budget.value !== suggested ? (
+            <div className="chip-row" style={{ marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic()
+                  budget.setRaw(String(suggested))
+                }}
+              >
+                Promedio de 3 meses: <Money value={suggested} /> · Usar
+              </button>
+            </div>
+          ) : (
+            <p className="caption" style={{ margin: '4px 0 0' }}>
+              Déjalo en 0 si no quieres límite.
+            </p>
+          )}
+        </div>
       )}
 
       {existing && !isFallback && (

@@ -8,6 +8,7 @@ import { suggestCategory } from '../lib/rules'
 import { FALLBACK_CATEGORY } from '../lib/seed'
 import { Sheet } from '../components/Sheet'
 import { AccountCard, Money, Segmented, Toggle } from '../components/ui'
+import { tell } from '../components/Dialog'
 
 type AmountMode = 'single' | 'split'
 type Sign = 'negExpense' | 'posExpense'
@@ -39,13 +40,19 @@ export function ImportSheet() {
   const onFile = async (file: File | undefined) => {
     if (!file) return
     if (/\.xlsx?$/i.test(file.name)) {
-      alert('Ese archivo es de Excel. Ábrelo en Excel o Numbers y guárdalo como CSV (Archivo → Exportar → CSV), y lo vuelves a subir.')
+      tell({
+        title: 'Ese archivo es de Excel',
+        message: 'Ábrelo en Excel o Numbers, guárdalo como CSV (Archivo → Exportar → CSV) y lo vuelves a subir.',
+      })
       return
     }
     const text = await readFile(file)
     const parsed = parseCSV(text)
     if (parsed.length < 2) {
-      alert('No encontré filas en ese archivo. Revisa que sea el extracto en CSV y que tenga al menos un movimiento.')
+      tell({
+        title: 'No encontré movimientos',
+        message: 'Revisa que sea el extracto en CSV y que tenga al menos una fila.',
+      })
       return
     }
     setFileName(file.name)
@@ -75,7 +82,10 @@ export function ImportSheet() {
 
   const headers = rows[0] ?? []
   const body = hasHeader ? rows.slice(1) : rows
-  const colOptions = headers.map((h, i) => ({ i, label: hasHeader ? h || `Columna ${i + 1}` : `Columna ${i + 1} (${(h ?? '').slice(0, 14)})` }))
+  const colOptions = headers.map((h, i) => ({
+    i,
+    label: hasHeader ? h || `Columna ${i + 1}` : `Columna ${i + 1} (${(h ?? '').slice(0, 14)})`,
+  }))
 
   const parsed = useMemo(() => {
     const expenseIds = new Set(categories.filter((c) => c.kind === 'expense').map((c) => c.id))
@@ -95,7 +105,8 @@ export function ImportSheet() {
         const cred = parseAmount(r[creditCol] ?? '') ?? 0
         value = Math.abs(cred) - Math.abs(deb)
       }
-      if (value === null || value === 0) return bad.push({ line, reason: `monto "${r[mode === 'single' ? amountCol : debitCol] ?? ''}" vacío o en cero` })
+      if (value === null || value === 0)
+        return bad.push({ line, reason: `monto "${r[mode === 'single' ? amountCol : debitCol] ?? ''}" vacío o en cero` })
       const name = (r[descCol] ?? '').replace(/\s+/g, ' ').trim() || 'Movimiento'
       const type = value < 0 ? 'expense' : 'income'
       const cat = suggestCategory(name, rules, type === 'expense' ? expenseIds : incomeIds) ?? FALLBACK_CATEGORY[type]
@@ -106,7 +117,7 @@ export function ImportSheet() {
 
   const doImport = () => {
     const { added, skipped } = importTransactions(parsed.ok)
-    toast(skipped ? `${added} nuevos · ${skipped} repetidos saltados` : `${added} movimientos importados`)
+    toast(skipped ? `${added} nuevos · ${skipped} ya estaban` : `${added} movimientos importados`)
     setFilters({ review: true })
     setTab('transactions')
     closeAll()
@@ -130,8 +141,8 @@ export function ImportSheet() {
       {!rows.length ? (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <p className="body">
-            Descarga el extracto desde la app o web de tu banco en <b>CSV</b> y súbelo aquí. Los movimientos quedan <b>por revisar</b>, con categoría sugerida, y si
-            importas el mismo extracto dos veces no se duplican.
+            Descarga el extracto desde la app o web de tu banco en <b>CSV</b> y súbelo aquí. Los movimientos quedan <b>por revisar</b>, con
+            categoría sugerida, y si importas el mismo extracto dos veces no se duplican.
           </p>
           <button className="btn primary" style={{ marginTop: 16 }} onClick={() => fileRef.current?.click()}>
             <FileUp size={18} /> Elegir archivo
@@ -236,7 +247,17 @@ export function ImportSheet() {
   )
 }
 
-function ColSelect({ label, value, onChange, options }: { label: string; value: number; onChange(v: number): void; options: { i: number; label: string }[] }) {
+function ColSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: number
+  onChange(v: number): void
+  options: { i: number; label: string }[]
+}) {
   return (
     <div className="kv">
       <span className="k">{label}</span>

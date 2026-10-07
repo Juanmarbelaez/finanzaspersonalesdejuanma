@@ -64,7 +64,11 @@ export function Recurrings() {
   if (!recurrings.length)
     return (
       <div className="screen">
-        <Empty art={<ArtCalendar />} title="Tus pagos fijos, en piloto automático" text="Agrega arriendo, servicios y suscripciones. Se registran solos cuando se cobran y te quedan por revisar.">
+        <Empty
+          art={<ArtCalendar />}
+          title="Tus pagos fijos"
+          text="Agrega arriendo, servicios y suscripciones. Se anotan solos el día del cobro y te quedan por revisar."
+        >
           <button className="btn primary small" onClick={() => openSheet({ name: 'recurringEdit' })}>
             Agregar recurrente
           </button>
@@ -82,7 +86,14 @@ export function Recurrings() {
             </div>
             <div className="caption">por pagar</div>
           </div>
-          <Ring value={paidSum} max={paidSum + leftSum || 1} status="ok" text={`${Math.round((paidSum / (paidSum + leftSum || 1)) * 100)}%`} size={86} stroke={9} />
+          <Ring
+            value={paidSum}
+            max={paidSum + leftSum || 1}
+            status="ok"
+            text={`${Math.round((paidSum / (paidSum + leftSum || 1)) * 100)}%`}
+            size={86}
+            stroke={9}
+          />
           <div style={{ textAlign: 'right' }}>
             <div className="display sm num" style={{ fontSize: 20 }}>
               <Money value={paidSum} />

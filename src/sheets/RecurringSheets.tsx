@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
+import { CalendarDays } from 'lucide-react'
 import { useStore, useUI } from '../store'
 import { useLocale, toast } from '../hooks'
 import { addMonths, parseISO, relativeDue, shortDate, todayISO } from '../lib/dates'
 import { FREQUENCY_LABEL, advance } from '../lib/recurring'
 import { uid } from '../lib/id'
+import { haptic } from '../lib/haptic'
 import type { Frequency, Recurring } from '../lib/types'
 import { Sheet } from '../components/Sheet'
-import { AmountField } from '../components/AmountField'
+import { AmountDisplay, Keypad, useAmount } from '../components/Keypad'
 import { TrendLine } from '../components/charts'
 import { TxRow } from '../components/TxRow'
 import { AccountCard, CatPill, Money, Segmented, Toggle } from '../components/ui'
@@ -36,11 +38,11 @@ export function RecurringSheet({ id }: { id: string }) {
   const labels = [...history.map((t) => shortDate(t.date, locale)), shortDate(r.nextDate, locale)]
   const perYear = r.amount * PER_YEAR[r.frequency]
 
+  // Los movimientos ya registrados se quedan; borrar el recurrente se puede deshacer
   const remove = () => {
-    if (!confirm(`¿Borrar ${r.name}? Los movimientos que ya se registraron se quedan.`)) return
-    deleteRecurring(r.id)
-    toast('Recurrente borrado')
+    const undo = deleteRecurring(r.id)
     closeSheet()
+    toast('Recurrente borrado', { label: 'Deshacer', run: undo })
   }
 
   return (
@@ -74,16 +76,21 @@ export function RecurringSheet({ id }: { id: string }) {
         </div>
         {r.active && (
           <div className="caption" style={{ marginTop: 4, textTransform: 'none' }}>
-            {relativeDue(r.nextDate)} · {parseISO(r.nextDate).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
+            {relativeDue(r.nextDate)} ·{' '}
+            {parseISO(r.nextDate).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
         )}
       </div>
 
       {r.type === 'expense' && r.frequency !== 'yearly' && (
         <div className="note" style={{ marginTop: 18 }}>
-          <span style={{ letterSpacing: 0 }}>📅</span>
+          <CalendarDays size={18} style={{ flexShrink: 0, marginTop: 2 }} />
           <span>
-            Al año son <b><Money value={perYear} /></b>.
+            Al año son{' '}
+            <b>
+              <Money value={perYear} />
+            </b>
+            .
           </span>
         </div>
       )}
@@ -117,25 +124,41 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
 
   const [type, setType] = useState<'expense' | 'income'>(existing?.type ?? (tx?.type === 'income' ? 'income' : 'expense'))
   const [name, setName] = useState(existing?.name ?? tx?.name ?? '')
-  const [amount, setAmount] = useState<number | null>(existing?.amount ?? tx?.amount ?? null)
+  const amount = useAmount(existing?.amount ?? tx?.amount ?? null)
+  // Monto vacío al crear: el teclado arranca abierto, como en un movimiento nuevo
+  const [pad, setPad] = useState(!existing && !tx)
+  const [error, setError] = useState<{ field: 'name' | 'amount' | 'category'; msg: string; n: number } | null>(null)
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? tx?.categoryId ?? '')
   const [accountId, setAccountId] = useState(existing?.accountId ?? tx?.accountId ?? accounts[0]?.id ?? '')
   const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? 'monthly')
   // Por defecto: el próximo cobro es en un mes (o un mes después del movimiento de origen)
   const [nextDate, setNextDate] = useState(
-    existing?.nextDate ?? (tx ? advance(tx.date, 'monthly', Number(tx.date.slice(8, 10))) : `${addMonths(today.slice(0, 7), 1)}-${today.slice(8, 10)}`),
+    existing?.nextDate ??
+      (tx ? advance(tx.date, 'monthly', Number(tx.date.slice(8, 10))) : `${addMonths(today.slice(0, 7), 1)}-${today.slice(8, 10)}`),
   )
   const [active, setActive] = useState(existing?.active ?? true)
 
   const kindCats = categories.filter((c) => c.kind === type)
-  const canSave = name.trim() && amount && amount > 0 && categoryId && accountId && nextDate
+  const press: typeof amount.press = (k) => {
+    amount.press(k)
+    if (error?.field === 'amount') setError(null)
+  }
+
+  const fail = (field: 'name' | 'amount' | 'category', msg: string) => {
+    haptic()
+    if (field !== 'amount') setPad(false)
+    setError((e) => ({ field, msg, n: (e?.n ?? 0) + 1 }))
+  }
 
   const save = () => {
-    if (!canSave || !amount) return
+    if (!name.trim()) return fail('name', 'Ponle un nombre: Arriendo, Netflix…')
+    if (!amount.value) return fail('amount', 'Escribe cuánto es')
+    if (!categoryId) return fail('category', 'Elige una categoría')
+    haptic()
     const r: Recurring = {
       id: existing?.id ?? uid(),
       name: name.trim(),
-      amount,
+      amount: amount.value,
       type,
       categoryId,
       accountId,
@@ -154,15 +177,19 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
     <Sheet
       title={existing ? 'Editar recurrente' : 'Nuevo recurrente'}
       footer={
-        <button className="save-bar" onClick={save} disabled={!canSave}>
-          Guardar
-        </button>
+        <>
+          {pad && <Keypad onKey={press} decimals={amount.decimals} decimalSep={amount.decimalSep} />}
+          <button className="save-bar" onClick={save}>
+            Guardar
+          </button>
+        </>
       }
       footerBar
     >
       <Segmented<'expense' | 'income'>
         value={type}
         onChange={(t) => {
+          setError(null)
           setType(t)
           if (categories.find((c) => c.id === categoryId)?.kind !== t) setCategoryId('')
         }}
@@ -173,18 +200,53 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
       />
 
       <input
-        className="big-input"
+        key={error?.field === 'name' ? error.n : undefined}
+        className={`big-input ${error?.field === 'name' ? 'shake' : ''}`}
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(e) => {
+          setName(e.target.value)
+          if (error?.field === 'name') setError(null)
+        }}
+        onFocus={() => setPad(false)}
         placeholder="Arriendo, Netflix, salario…"
         aria-label="Nombre"
         style={{ marginTop: 18 }}
       />
-      <AmountField value={amount} onChange={setAmount} variant="big" className={type === 'income' ? 'pos' : ''} />
+      <div style={{ textAlign: 'center' }}>
+        <AmountDisplay
+          display={amount.display}
+          empty={amount.empty}
+          active={pad}
+          onActivate={() => {
+            ;(document.activeElement as HTMLElement | null)?.blur()
+            setPad(true)
+          }}
+          shake={error?.field === 'amount' ? error.n : undefined}
+          className={type === 'income' ? 'pos' : ''}
+        />
+      </div>
+      {error && (
+        <p className="caption neg" role="alert" style={{ textAlign: 'center', margin: '2px 0 0' }}>
+          {error.msg}
+        </p>
+      )}
 
-      <div className="picker-grid" style={{ marginTop: 16 }}>
+      <div
+        key={error?.field === 'category' ? error.n : undefined}
+        className={`picker-grid ${error?.field === 'category' ? 'shake' : ''}`}
+        style={{ marginTop: 16 }}
+      >
         {kindCats.map((c) => (
-          <CatPill key={c.id} category={c} selected={categoryId === c.id} onClick={() => setCategoryId(c.id)} />
+          <CatPill
+            key={c.id}
+            category={c}
+            selected={categoryId === c.id}
+            onClick={() => {
+              haptic()
+              setCategoryId(c.id)
+              if (error?.field === 'category') setError(null)
+            }}
+          />
         ))}
       </div>
 

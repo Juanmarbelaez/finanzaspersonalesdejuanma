@@ -60,7 +60,7 @@ export function paceStatus(spent: number, budget: number, expectedToDate: number
   return 'ok'
 }
 
-/** Proyección honesta al cierre: fijos completos + lo variable al ritmo actual. */
+/** Proyección al cierre: fijos completos + lo variable al ritmo actual. */
 export function projectMonth(spent: number, fixed: number[], day: number): number {
   const fixedTotal = fixed.reduce((s, v) => s + v, 0)
   const fixedSoFar = fixed.slice(0, day).reduce((s, v) => s + v, 0)

@@ -3,6 +3,9 @@ import { create } from 'zustand'
 import { useStore } from './store'
 import { formatMoney, type MoneyOpts } from './lib/format'
 import type { Account, Category } from './lib/types'
+import { currentMonth, todayISO } from './lib/dates'
+import { inMonth, totalBudget, totals } from './lib/selectors'
+import { expectedCurve, fixedSchedule, paceStatus, type PaceStatus } from './lib/pace'
 
 export function useFmt() {
   const locale = useStore((s) => s.settings.locale)
@@ -24,26 +27,42 @@ export function useAccountMap(): Map<string, Account> {
   return useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 }
 
+export interface ToastAction {
+  label: string
+  run(): void
+}
+
 interface ToastState {
   message: string | null
-  show(message: string): void
+  action: ToastAction | null
+  /** Cambia con cada aviso para reiniciar la animación */
+  n: number
+  show(message: string, action?: ToastAction): void
+  hide(): void
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined
 
 export const useToast = create<ToastState>()((set) => ({
   message: null,
-  show(message) {
+  action: null,
+  n: 0,
+  show(message, action) {
     clearTimeout(timer)
-    set({ message })
-    timer = setTimeout(() => set({ message: null }), 2200)
+    set((s) => ({ message, action: action ?? null, n: s.n + 1 }))
+    // Con "Deshacer" se queda más tiempo para alcanzar a tocarlo
+    timer = setTimeout(() => set({ message: null, action: null }), action ? 5000 : 2200)
+  },
+  hide() {
+    clearTimeout(timer)
+    set({ message: null, action: null })
   },
 }))
 
-export const toast = (m: string) => useToast.getState().show(m)
+/** Aviso tipo HUD de iOS. Con acción, muestra un botón (por ejemplo Deshacer). */
+export const toast = (m: string, action?: ToastAction) => useToast.getState().show(m, action)
 
-const reducedMotion = () =>
-  typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Número que sube suavemente hasta su valor (los montos grandes "se cuentan"). */
 export function useCountUp(target: number, ms = 750): number {
@@ -68,4 +87,57 @@ export function useCountUp(target: number, ms = 750): number {
     return () => cancelAnimationFrame(raf)
   }, [target, ms])
   return value
+}
+
+/**
+ * Cómo va el mes (al ritmo esperado, con los fijos en su día). Pinta la luz de arriba
+ * de la app: verde si vas bien, ámbar si vas rápido, rojo si ya te pasaste.
+ */
+export function useMonthMood(): PaceStatus {
+  const transactions = useStore((s) => s.transactions)
+  const categories = useStore((s) => s.categories)
+  const recurrings = useStore((s) => s.recurrings)
+  return useMemo(() => {
+    const budget = totalBudget(categories)
+    if (!budget) return 'ok'
+    const month = currentMonth()
+    const day = Number(todayISO().slice(8, 10))
+    const spent = totals(inMonth(transactions, month)).expense
+    const expected = expectedCurve(budget, fixedSchedule(recurrings, month))[day - 1] ?? budget
+    return paceStatus(spent, budget, expected)
+  }, [transactions, categories, recurrings])
+}
+
+/** El header pasa a vidrio cuando el contenido empieza a pasar por debajo. */
+export function useScrolled(threshold = 4): boolean {
+  const [scrolled, setScrolled] = useState(() => typeof window !== 'undefined' && window.scrollY > threshold)
+  useEffect(() => {
+    let raf = 0
+    const on = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        setScrolled(window.scrollY > threshold)
+      })
+    }
+    window.addEventListener('scroll', on, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', on)
+      cancelAnimationFrame(raf)
+    }
+  }, [threshold])
+  return scrolled
+}
+
+/** Tema efectivo: "Automático" sigue al iPhone y cambia en vivo. */
+export function useResolvedTheme(theme: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  const query = typeof matchMedia !== 'undefined' ? matchMedia('(prefers-color-scheme: light)') : null
+  const [light, setLight] = useState(() => !!query?.matches)
+  useEffect(() => {
+    if (!query) return
+    const on = () => setLight(query.matches)
+    query.addEventListener('change', on)
+    return () => query.removeEventListener('change', on)
+  }, [query])
+  return theme === 'system' ? (light ? 'light' : 'dark') : theme
 }

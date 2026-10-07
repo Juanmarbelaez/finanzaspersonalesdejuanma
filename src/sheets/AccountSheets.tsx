@@ -7,10 +7,12 @@ import { ACCOUNT_COLORS } from '../lib/seed'
 import { uid } from '../lib/id'
 import type { Account } from '../lib/types'
 import { Sheet } from '../components/Sheet'
-import { AmountField } from '../components/AmountField'
+import { AmountDisplay, Keypad, useAmount } from '../components/Keypad'
+import { haptic } from '../lib/haptic'
 import { TrendLine } from '../components/charts'
 import { TxRow } from '../components/TxRow'
 import { ACCOUNT_TYPE_LABEL, AccountCard, Money, Segmented } from '../components/ui'
+import { ask } from '../components/Dialog'
 
 /* ---------------- Detalle ---------------- */
 
@@ -68,7 +70,11 @@ export function AccountSheet({ id }: { id: string }) {
       </div>
 
       <div style={{ marginTop: 18 }}>
-        <TrendLine values={series.map((p) => (isCredit ? -p.value : p.value))} labels={series.map((p) => shortDate(p.date, locale))} height={100} />
+        <TrendLine
+          values={series.map((p) => (isCredit ? -p.value : p.value))}
+          labels={series.map((p) => shortDate(p.date, locale))}
+          height={100}
+        />
       </div>
       {isCredit && (
         <p className="caption" style={{ textAlign: 'center', margin: '6px 0 0' }}>
@@ -97,15 +103,18 @@ export function AccountEditSheet({ id, type: presetType }: { id?: string; type?:
   const [color, setColor] = useState(existing?.color ?? ACCOUNT_COLORS[0])
   const isCredit = type === 'credit'
   // En tarjetas se escribe la deuda en positivo y se guarda en negativo
-  const [balance, setBalance] = useState<number | null>(
-    existing ? Math.abs(existing.startingBalance) || null : null,
-  )
-
-  const canSave = name.trim().length > 0
+  const balance = useAmount(existing ? Math.abs(existing.startingBalance) || null : null)
+  const [pad, setPad] = useState(false)
+  const [error, setError] = useState<{ msg: string; n: number } | null>(null)
 
   const save = () => {
-    if (!canSave) return
-    const amount = balance ?? 0
+    if (!name.trim()) {
+      haptic()
+      setPad(false)
+      return setError((e) => ({ msg: 'Ponle un nombre a la cuenta', n: (e?.n ?? 0) + 1 }))
+    }
+    haptic()
+    const amount = balance.value ?? 0
     upsertAccount({
       id: existing?.id ?? uid(),
       name: name.trim(),
@@ -117,24 +126,34 @@ export function AccountEditSheet({ id, type: presetType }: { id?: string; type?:
     closeSheet()
   }
 
-  const remove = () => {
+  // Con movimientos se confirma (se van con ella); igual queda "Deshacer" unos segundos
+  const remove = async () => {
     if (!existing) return
-    const msg = count
-      ? `Se borran también sus ${count} movimientos. Esto no se puede deshacer. ¿Borrar ${existing.name}?`
-      : `¿Borrar ${existing.name}?`
-    if (!confirm(msg)) return
-    deleteAccount(existing.id)
-    toast('Cuenta borrada')
+    if (
+      count &&
+      !(await ask({
+        title: `¿Borrar ${existing.name}?`,
+        message: `Se van también sus ${count} movimientos.`,
+        confirm: 'Borrar cuenta y movimientos',
+        destructive: true,
+      }))
+    )
+      return
+    const undo = deleteAccount(existing.id)
     closeAll()
+    toast('Cuenta borrada', { label: 'Deshacer', run: undo })
   }
 
   return (
     <Sheet
       title={existing ? 'Editar cuenta' : 'Nueva cuenta'}
       footer={
-        <button className="save-bar" onClick={save} disabled={!canSave}>
-          Guardar
-        </button>
+        <>
+          {pad && <Keypad onKey={balance.press} decimals={balance.decimals} decimalSep={balance.decimalSep} />}
+          <button className="save-bar" onClick={save}>
+            Guardar
+          </button>
+        </>
       }
       footerBar
     >
@@ -143,25 +162,50 @@ export function AccountEditSheet({ id, type: presetType }: { id?: string; type?:
       </div>
 
       <input
-        className="big-input"
+        key={error?.n}
+        className={`big-input ${error ? 'shake' : ''}`}
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(e) => {
+          setName(e.target.value)
+          setError(null)
+        }}
+        onFocus={() => setPad(false)}
         placeholder="Nombre de la cuenta"
         aria-label="Nombre de la cuenta"
         style={{ marginTop: 16 }}
       />
+      {error && (
+        <p className="caption neg" style={{ textAlign: 'center', margin: '2px 0 0' }}>
+          {error.msg}
+        </p>
+      )}
 
-      <div className="eyebrow gray" style={{ textAlign: 'center', marginTop: 10 }}>
-        {isCredit ? 'Deuda de hoy' : 'Saldo de hoy'}
+      <div style={{ textAlign: 'center', marginTop: 10 }}>
+        <div className="eyebrow gray">{isCredit ? 'Deuda de hoy' : 'Saldo de hoy'}</div>
+        <AmountDisplay
+          display={balance.display}
+          empty={balance.empty}
+          active={pad}
+          onActivate={() => setPad(true)}
+          label={isCredit ? 'Deuda actual' : 'Saldo actual'}
+        />
+        <p className="caption" style={{ margin: '4px 0 0' }}>
+          Desde aquí la app suma y resta tus movimientos.
+        </p>
       </div>
-      <AmountField value={balance} onChange={setBalance} variant="big" ariaLabel={isCredit ? 'Deuda actual' : 'Saldo actual'} />
-      <p className="caption" style={{ textAlign: 'center', margin: '6px 0 0' }}>
-        Desde aquí la app suma y resta tus movimientos.
-      </p>
 
       <div className="swatches" style={{ marginTop: 22 }}>
         {ACCOUNT_COLORS.map((c) => (
-          <button key={c} className={c === color ? 'active' : ''} style={{ background: c }} onClick={() => setColor(c)} aria-label={`Color ${c}`} />
+          <button
+            key={c}
+            className={c === color ? 'active' : ''}
+            style={{ background: c }}
+            onClick={() => {
+              haptic()
+              setColor(c)
+            }}
+            aria-label={`Color ${c}`}
+          />
         ))}
       </div>
 

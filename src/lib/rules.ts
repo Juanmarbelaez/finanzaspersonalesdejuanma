@@ -90,11 +90,7 @@ const hasWord = (haystack: string, needle: string) => ` ${haystack} `.includes(`
  * 1) lo que el usuario ya eligió antes para ese comercio (reglas aprendidas)
  * 2) palabras clave por defecto
  */
-export function suggestCategory(
-  name: string,
-  rules: Record<string, string>,
-  validIds: Set<string>,
-): string | null {
+export function suggestCategory(name: string, rules: Record<string, string>, validIds: Set<string>): string | null {
   const n = normalizeMerchant(name)
   if (!n) return null
   if (rules[n] && validIds.has(rules[n])) return rules[n]

@@ -8,6 +8,8 @@ import { isStandalone, readFile, saveFile } from '../lib/download'
 import type { Theme } from '../lib/types'
 import { Sheet } from '../components/Sheet'
 import { ListItem, Segmented } from '../components/ui'
+import { ask, tell } from '../components/Dialog'
+import { signOut, useAuth } from '../lib/cloud'
 
 const CURRENCIES = [
   { code: 'COP', label: 'Peso colombiano (COP)' },
@@ -15,6 +17,14 @@ const CURRENCIES = [
   { code: 'EUR', label: 'Euro (EUR)' },
   { code: 'MXN', label: 'Peso mexicano (MXN)' },
 ]
+
+const SYNC_LABEL = {
+  idle: 'Al día',
+  saving: 'Guardando…',
+  saved: 'Guardado',
+  offline: 'Sin internet: se guarda al volver',
+  error: 'No se pudo guardar, reintentando',
+} as const
 
 export function SettingsSheet() {
   const settings = useStore((s) => s.settings)
@@ -24,6 +34,8 @@ export function SettingsSheet() {
   const { openSheet, closeAll, setTab } = useUI.getState()
   const locale = useLocale()
   const fileRef = useRef<HTMLInputElement>(null)
+  const auth = useAuth()
+  const cloud = auth.status === 'signedIn'
 
   const daysSinceBackup = settings.lastBackup ? Math.floor((Date.now() - settings.lastBackup) / 86_400_000) : null
 
@@ -75,15 +87,24 @@ export function SettingsSheet() {
     try {
       const data = JSON.parse(await readFile(file)) as Partial<Data>
       if (!Array.isArray(data.transactions) || !Array.isArray(data.accounts) || !Array.isArray(data.categories)) {
-        alert('Ese archivo no parece un respaldo de Plata. Elige el .json que exportaste desde Ajustes → Exportar respaldo.')
+        tell({
+          title: 'No es un respaldo de Plata',
+          message: 'Elige el .json que exportaste desde Ajustes → Exportar respaldo.',
+        })
         return
       }
-      if (!confirm(`Vas a reemplazar todo con el respaldo (${data.transactions.length} movimientos). ¿Seguir?`)) return
+      const ok = await ask({
+        title: 'Restaurar respaldo',
+        message: `Lo que tienes ahora se reemplaza por el respaldo (${data.transactions.length} movimientos).`,
+        confirm: 'Reemplazar con el respaldo',
+        destructive: true,
+      })
+      if (!ok) return
       restore(data as Data)
       toast('Respaldo restaurado')
       closeAll()
     } catch {
-      alert('No pude leer el archivo. Verifica que sea el .json del respaldo, sin editar.')
+      tell({ title: 'No pude leer el archivo', message: 'Verifica que sea el .json del respaldo, sin editar.' })
     } finally {
       if (fileRef.current) fileRef.current.value = ''
     }
@@ -92,6 +113,25 @@ export function SettingsSheet() {
   return (
     <Sheet title="Ajustes" full>
       <div className="list-group">
+        {cloud ? (
+          <>
+            <div className="kv">
+              <span className="k">Cuenta</span>
+              <span className="v">{auth.email}</span>
+            </div>
+            <div className="kv">
+              <span className="k">En la nube</span>
+              <span className={`v sync ${auth.sync}`}>{SYNC_LABEL[auth.sync]}</span>
+            </div>
+          </>
+        ) : (
+          !demo && (
+            <ListItem label="Crear cuenta o entrar" value="Guarda tus datos en la nube" onClick={() => openSheet({ name: 'auth' })} />
+          )
+        )}
+      </div>
+
+      <div className="list-group" style={{ marginTop: 12 }}>
         <div className="kv">
           <label className="k" htmlFor="set-name">
             Tu nombre
@@ -129,7 +169,8 @@ export function SettingsSheet() {
           <div className="note good">
             <Share size={18} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>
-              En Safari toca <b>Compartir</b> → <b>Agregar a pantalla de inicio</b>. Abre a pantalla completa, sin barra de Safari, y funciona sin internet.
+              En Safari toca <b>Compartir</b> → <b>Agregar a pantalla de inicio</b>. Abre a pantalla completa, sin barra de Safari, y
+              funciona sin internet.
             </span>
           </div>
         </>
@@ -158,8 +199,18 @@ export function SettingsSheet() {
       <div className="eyebrow gray group-title">Respaldo</div>
       <div className={`note ${daysSinceBackup === null || daysSinceBackup > 30 ? 'warn' : ''}`} style={{ marginBottom: 10 }}>
         <span>
-          Tus datos viven <b>solo en este dispositivo</b>. Si borras Safari o cambias de celular, se pierden sin respaldo.{' '}
-          {daysSinceBackup === null ? 'Todavía no has hecho ninguno.' : daysSinceBackup === 0 ? 'Último respaldo: hoy.' : `Último respaldo: hace ${daysSinceBackup} días.`}
+          {cloud ? (
+            <>Tus datos se guardan solos en tu cuenta. El respaldo es una copia extra en un archivo. </>
+          ) : (
+            <>
+              Tus datos viven <b>solo en este dispositivo</b>. Si borras Safari o cambias de celular, se pierden sin respaldo.{' '}
+            </>
+          )}
+          {daysSinceBackup === null
+            ? 'Todavía no has hecho ninguno.'
+            : daysSinceBackup === 0
+              ? 'Último respaldo: hoy.'
+              : `Último respaldo: hace ${daysSinceBackup} días.`}
         </span>
       </div>
       <div className="list-group">
@@ -171,11 +222,35 @@ export function SettingsSheet() {
 
       <div className="eyebrow gray group-title">Otros</div>
       <div className="list-group">
+        {cloud && (
+          <ListItem
+            label="Cerrar sesión"
+            onClick={async () => {
+              const ok = await ask({
+                title: 'Cerrar sesión',
+                message: 'Tus datos quedan guardados en la nube y este iPhone queda limpio.',
+                confirm: 'Cerrar sesión',
+              })
+              if (!ok) return
+              closeAll()
+              await signOut()
+            }}
+          />
+        )}
         {!demo && (
           <ListItem
             label="Probar con datos de ejemplo"
-            onClick={() => {
-              if (count && !confirm('Esto reemplaza tus datos por datos de ejemplo. Haz un respaldo antes si quieres conservarlos. ¿Seguir?')) return
+            onClick={async () => {
+              if (
+                count &&
+                !(await ask({
+                  title: 'Probar con datos de ejemplo',
+                  message: 'Tus datos se reemplazan por los de ejemplo. Si los quieres conservar, exporta un respaldo antes.',
+                  confirm: 'Reemplazar por datos de ejemplo',
+                  destructive: true,
+                }))
+              )
+                return
               start('demo')
               closeAll()
             }}
@@ -184,8 +259,14 @@ export function SettingsSheet() {
         <ListItem
           danger
           label="Borrar todo"
-          onClick={() => {
-            if (!confirm('Se borran todos tus movimientos, cuentas y categorías de este dispositivo. ¿Seguro?')) return
+          onClick={async () => {
+            const ok = await ask({
+              title: 'Borrar todo',
+              message: 'Se borran tus movimientos, cuentas y categorías de este iPhone. No se puede deshacer.',
+              confirm: 'Borrar todo',
+              destructive: true,
+            })
+            if (!ok) return
             resetAll()
             closeAll()
           }}

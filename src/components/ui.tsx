@@ -5,7 +5,6 @@ import { useStore } from '../store'
 import { moneyParts, type MoneyOpts } from '../lib/format'
 import type { Account, Category } from '../lib/types'
 
-
 /** Monto con el "$" pequeño, como en Copilot. */
 export function Money({ value, className = '', ...opts }: { value: number; className?: string } & MoneyOpts) {
   const locale = useStore((s) => s.settings.locale)
@@ -115,7 +114,15 @@ export function Ring({
 }
 
 /** Dona de varios segmentos (gasto por categoría, pagado vs pendiente). */
-export function Donut({ segments, size = 92, stroke = 11 }: { segments: { value: number; color: string }[]; size?: number; stroke?: number }) {
+export function Donut({
+  segments,
+  size = 92,
+  stroke = 11,
+}: {
+  segments: { value: number; color: string }[]
+  size?: number
+  stroke?: number
+}) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   const total = segments.reduce((s, x) => s + x.value, 0)
@@ -164,7 +171,9 @@ export function AccountCard({
   const style = { '--c': account.color, '--fg': isLight(account.color) ? '#000' : '#fff' } as React.CSSProperties
   const inner = (
     <>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: selected && onClick ? 18 : 0 }}>{account.name}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: selected && onClick ? 18 : 0 }}>
+        {account.name}
+      </span>
       <span className="t">{type}</span>
       {selected && onClick && (
         <span className="tick" aria-hidden>
@@ -247,7 +256,15 @@ export function Segmented<T extends string>({
   )
 }
 
-export function Periods<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange(v: T): void }) {
+export function Periods<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange(v: T): void
+}) {
   return (
     <div className="periods">
       {options.map((o) => (

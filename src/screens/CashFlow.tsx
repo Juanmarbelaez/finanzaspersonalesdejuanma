@@ -61,7 +61,12 @@ export function CashFlow() {
     const prevStart = addMonths(start, -n)
     const cur = transactions.filter((t) => monthKey(t.date) >= start)
     const prev = transactions.filter((t) => monthKey(t.date) >= prevStart && monthKey(t.date) < start)
-    const pts = series.map((p) => ({ label: shortMonthLabel(p.month, locale).charAt(0), tip: monthLabel(p.month, locale), income: p.income, expense: p.expense }))
+    const pts = series.map((p) => ({
+      label: shortMonthLabel(p.month, locale).charAt(0),
+      tip: monthLabel(p.month, locale),
+      income: p.income,
+      expense: p.expense,
+    }))
     return { pts, cur, prev, range: `${monthLabel(start, locale)} – ${monthLabel(end, locale)}`, labelEvery: 1 }
   }, [transactions, period, month, upTo, locale])
 
@@ -87,7 +92,11 @@ export function CashFlow() {
         <section className="card center">
           <div className="eyebrow gray">Neto</div>
           {period === 'month' ? (
-            <button className="caption" onClick={() => openSheet({ name: 'month' })} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginTop: 4 }}>
+            <button
+              className="caption"
+              onClick={() => openSheet({ name: 'month' })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginTop: 4 }}
+            >
               {data.range} <ChevronDown size={13} />
             </button>
           ) : (
@@ -100,7 +109,11 @@ export function CashFlow() {
           </div>
           <Delta current={t.net} previous={p.net} />
           <div style={{ marginTop: 18 }}>
-            <FlowBars mode="net" labelEvery={data.labelEvery} data={data.pts.map((x) => ({ label: x.label, tip: x.tip, value: x.income - x.expense }))} />
+            <FlowBars
+              mode="net"
+              labelEvery={data.labelEvery}
+              data={data.pts.map((x) => ({ label: x.label, tip: x.tip, value: x.income - x.expense }))}
+            />
           </div>
           <div className="legend-row" style={{ marginTop: 16, textAlign: 'left' }}>
             <div>
@@ -123,14 +136,23 @@ export function CashFlow() {
           </div>
           <Delta current={t.expense} previous={p.expense} invert />
           <div style={{ marginTop: 18 }}>
-            <FlowBars mode="spend" labelEvery={data.labelEvery} data={data.pts.map((x) => ({ label: x.label, tip: x.tip, value: x.expense }))} />
+            <FlowBars
+              mode="spend"
+              labelEvery={data.labelEvery}
+              data={data.pts.map((x) => ({ label: x.label, tip: x.tip, value: x.expense }))}
+            />
           </div>
           {top.length > 0 && (
             <div style={{ marginTop: 16, textAlign: 'left' }}>
               {top.map(([id, v]) => {
                 const c = cats.get(id)
                 return (
-                  <button key={id} className="cat-line" style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto' }} onClick={() => openSheet({ name: 'category', id })}>
+                  <button
+                    key={id}
+                    className="cat-line"
+                    style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto' }}
+                    onClick={() => openSheet({ name: 'category', id })}
+                  >
                     <span className="nm">
                       <span className="e">{c?.emoji ?? '❔'}</span>
                       <span>{c?.name ?? 'Sin categoría'}</span>
@@ -161,7 +183,11 @@ export function CashFlow() {
           </div>
           <Delta current={t.income} previous={p.income} />
           <div style={{ marginTop: 18 }}>
-            <FlowBars mode="income" labelEvery={data.labelEvery} data={data.pts.map((x) => ({ label: x.label, tip: x.tip, value: x.income }))} />
+            <FlowBars
+              mode="income"
+              labelEvery={data.labelEvery}
+              data={data.pts.map((x) => ({ label: x.label, tip: x.tip, value: x.income }))}
+            />
           </div>
         </section>
       </div>

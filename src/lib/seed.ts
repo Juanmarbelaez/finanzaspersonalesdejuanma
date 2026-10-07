@@ -78,19 +78,54 @@ const FIXED: Fixed[] = [
 ]
 
 const VARIABLE: { names: string[]; categoryId: string; min: number; max: number; perWeek: number; accounts: string[] }[] = [
-  { names: ['Éxito', 'Carulla', 'D1', 'Ara'], categoryId: 'mercado', min: 60_000, max: 380_000, perWeek: 1.6, accounts: ['tarjeta', 'principal'] },
-  { names: ['Rappi', 'Crepes & Waffles', 'Juan Valdez', 'El Corral', 'Wok'], categoryId: 'restaurantes', min: 18_000, max: 140_000, perWeek: 2.6, accounts: ['tarjeta', 'nequi'] },
+  {
+    names: ['Éxito', 'Carulla', 'D1', 'Ara'],
+    categoryId: 'mercado',
+    min: 60_000,
+    max: 380_000,
+    perWeek: 1.6,
+    accounts: ['tarjeta', 'principal'],
+  },
+  {
+    names: ['Rappi', 'Crepes & Waffles', 'Juan Valdez', 'El Corral', 'Wok'],
+    categoryId: 'restaurantes',
+    min: 18_000,
+    max: 140_000,
+    perWeek: 2.6,
+    accounts: ['tarjeta', 'nequi'],
+  },
   { names: ['Uber', 'DiDi', 'Cabify'], categoryId: 'transporte', min: 9_000, max: 38_000, perWeek: 3, accounts: ['tarjeta', 'nequi'] },
   { names: ['Terpel'], categoryId: 'transporte', min: 120_000, max: 190_000, perWeek: 0.45, accounts: ['tarjeta'] },
-  { names: ['Amazon', 'Falabella', 'Mercado Libre', 'Zara'], categoryId: 'compras', min: 49_000, max: 420_000, perWeek: 0.7, accounts: ['tarjeta'] },
-  { names: ['Cine Colombia', 'Concierto', 'Bolera'], categoryId: 'entretenimiento', min: 25_000, max: 160_000, perWeek: 0.5, accounts: ['tarjeta', 'efectivo'] },
+  {
+    names: ['Amazon', 'Falabella', 'Mercado Libre', 'Zara'],
+    categoryId: 'compras',
+    min: 49_000,
+    max: 420_000,
+    perWeek: 0.7,
+    accounts: ['tarjeta'],
+  },
+  {
+    names: ['Cine Colombia', 'Concierto', 'Bolera'],
+    categoryId: 'entretenimiento',
+    min: 25_000,
+    max: 160_000,
+    perWeek: 0.5,
+    accounts: ['tarjeta', 'efectivo'],
+  },
   { names: ['Cruz Verde', 'Farmatodo'], categoryId: 'salud', min: 15_000, max: 90_000, perWeek: 0.35, accounts: ['tarjeta', 'efectivo'] },
-  { names: ['Tienda de la esquina', 'Panadería'], categoryId: 'mercado', min: 4_000, max: 22_000, perWeek: 1.2, accounts: ['efectivo', 'nequi'] },
+  {
+    names: ['Tienda de la esquina', 'Panadería'],
+    categoryId: 'mercado',
+    min: 4_000,
+    max: 22_000,
+    perWeek: 1.2,
+    accounts: ['efectivo', 'nequi'],
+  },
 ]
 
 export function buildDemo(today = todayISO()) {
   const rand = rng(42)
-  const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)]
+  const pick = <T>(arr: T[]) => arr[Math.floor(rand() * arr.length)]
   const round = (n: number) => Math.round(n / 100) * 100
   const txs: Transaction[] = []
   const recurrings: Recurring[] = FIXED.map((f) => ({
@@ -134,7 +169,17 @@ export function buildDemo(today = todayISO()) {
     if (m % 2 === 1) {
       const date = `${month}-18`
       if (date <= today)
-        txs.push({ id: uid(), date, type: 'income', amount: 1_250_000, name: 'Proyecto freelance', categoryId: 'negocio', accountId: 'nequi', reviewed: true, createdAt: 0 })
+        txs.push({
+          id: uid(),
+          date,
+          type: 'income',
+          amount: 1_250_000,
+          name: 'Proyecto freelance',
+          categoryId: 'negocio',
+          accountId: 'nequi',
+          reviewed: true,
+          createdAt: 0,
+        })
     }
 
     // Movimientos entre cuentas: recarga a Nequi, retiro de cajero y pago de la tarjeta
@@ -146,7 +191,18 @@ export function buildDemo(today = todayISO()) {
     for (const [dd, amount, to, name] of transfers) {
       const date = `${month}-${dd}`
       if (date <= today)
-        txs.push({ id: uid(), date, type: 'transfer', amount, name, categoryId: null, accountId: 'principal', toAccountId: to, reviewed: true, createdAt: 0 })
+        txs.push({
+          id: uid(),
+          date,
+          type: 'transfer',
+          amount,
+          name,
+          categoryId: null,
+          accountId: 'principal',
+          toAccountId: to,
+          reviewed: true,
+          createdAt: 0,
+        })
     }
   }
 

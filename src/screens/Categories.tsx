@@ -40,7 +40,11 @@ export function Categories() {
             <div className="display sm num" style={{ fontSize: 20 }}>
               <Money value={spent} />
             </div>
-            <button className="caption" onClick={() => openSheet({ name: 'month' })} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <button
+              className="caption"
+              onClick={() => openSheet({ name: 'month' })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
+            >
               gastado en {monthLabel(month, locale, false).toLowerCase()} <ChevronDown size={13} />
             </button>
           </div>
@@ -94,7 +98,12 @@ export function Categories() {
               Ingresos del mes
             </div>
             {incomeCats.map((c) => (
-              <button key={c.id} className="cat-line" style={{ gridTemplateColumns: '1fr auto' }} onClick={() => openSheet({ name: 'category', id: c.id })}>
+              <button
+                key={c.id}
+                className="cat-line"
+                style={{ gridTemplateColumns: '1fr auto' }}
+                onClick={() => openSheet({ name: 'category', id: c.id })}
+              >
                 <span className="nm">
                   <span className="e">{c.emoji}</span>
                   <span>{c.name}</span>

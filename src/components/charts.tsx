@@ -126,7 +126,13 @@ export function PaceChart({
             strokeDasharray="3 5"
           />
         ) : (
-          <polyline points={prev.map((v, i) => `${x(i)},${y(v)}`).join(' ')} fill="none" stroke="var(--text-3)" strokeWidth={1.5} strokeDasharray="3 5" />
+          <polyline
+            points={prev.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+            fill="none"
+            stroke="var(--text-3)"
+            strokeWidth={1.5}
+            strokeDasharray="3 5"
+          />
         )}
         {shown.slice(1).map((v, k) => {
           const i = k + 1
@@ -153,7 +159,14 @@ export function PaceChart({
                 </text>
               </g>
             ) : null}
-            <circle cx={lx} cy={ly} r={5} fill="var(--surface)" stroke={budget ? statusColor(endStatus) : 'var(--accent)'} strokeWidth={3} />
+            <circle
+              cx={lx}
+              cy={ly}
+              r={5}
+              fill="var(--surface)"
+              stroke={budget ? statusColor(endStatus) : 'var(--accent)'}
+              strokeWidth={3}
+            />
           </>
         )}
         {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={top - 6} y2={top + plotH} stroke="var(--text-3)" strokeWidth={1} />}
@@ -312,7 +325,10 @@ export function FlowBars({
           const h = zero - y(d.value)
           return (
             <g key={i} opacity={hover === null || hover === i ? 1 : 0.55}>
-              <path d={barPath(cx - bw / 2, d.value >= 0 ? y(d.value) : zero, bw, d.value >= 0 ? h : -(y(d.value) - zero), 2)} fill={fill(d.value)} />
+              <path
+                d={barPath(cx - bw / 2, d.value >= 0 ? y(d.value) : zero, bw, d.value >= 0 ? h : -(y(d.value) - zero), 2)}
+                fill={fill(d.value)}
+              />
               {i % labelEvery === 0 && (
                 <text x={cx} y={H - 3} textAnchor="middle">
                   {d.label}
@@ -385,11 +401,27 @@ export function TrendLine({
           strokeLinecap="round"
         />
         {dashedLast && values.length > 1 && (
-          <line x1={x(last - 1)} y1={y(values[last - 1])} x2={x(last)} y2={y(values[last])} stroke="var(--text-3)" strokeWidth={2} strokeDasharray="3 4" />
+          <line
+            x1={x(last - 1)}
+            y1={y(values[last - 1])}
+            x2={x(last)}
+            y2={y(values[last])}
+            stroke="var(--text-3)"
+            strokeWidth={2}
+            strokeDasharray="3 4"
+          />
         )}
         {dashedLast &&
           values.map((v, i) => (
-            <circle key={i} cx={x(i)} cy={y(v)} r={4} fill="var(--surface)" stroke={i === last ? 'var(--text-3)' : 'var(--accent)'} strokeWidth={2} />
+            <circle
+              key={i}
+              cx={x(i)}
+              cy={y(v)}
+              r={4}
+              fill="var(--surface)"
+              stroke={i === last ? 'var(--text-3)' : 'var(--accent)'}
+              strokeWidth={2}
+            />
           ))}
         {!dashedLast && <circle cx={x(last)} cy={y(values[last])} r={4.5} fill="var(--surface)" stroke={color} strokeWidth={2.5} />}
         {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={top} y2={top + plotH} stroke="var(--text-3)" strokeWidth={1} />}

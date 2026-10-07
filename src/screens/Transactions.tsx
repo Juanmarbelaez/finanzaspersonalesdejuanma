@@ -60,9 +60,14 @@ export function Transactions() {
   const chips: { label: string; clear(): void }[] = []
   if (filters.review) chips.push({ label: 'Por revisar', clear: () => setFilters({ review: false }) })
   if (filters.type !== 'all')
-    chips.push({ label: { expense: 'Gastos', income: 'Ingresos', transfer: 'Transferencias' }[filters.type], clear: () => setFilters({ type: 'all' }) })
-  if (filters.categoryId) chips.push({ label: cats.get(filters.categoryId)?.name ?? 'Categoría', clear: () => setFilters({ categoryId: null }) })
-  if (filters.accountId) chips.push({ label: accounts.get(filters.accountId)?.name ?? 'Cuenta', clear: () => setFilters({ accountId: null }) })
+    chips.push({
+      label: { expense: 'Gastos', income: 'Ingresos', transfer: 'Transferencias' }[filters.type],
+      clear: () => setFilters({ type: 'all' }),
+    })
+  if (filters.categoryId)
+    chips.push({ label: cats.get(filters.categoryId)?.name ?? 'Categoría', clear: () => setFilters({ categoryId: null }) })
+  if (filters.accountId)
+    chips.push({ label: accounts.get(filters.accountId)?.name ?? 'Cuenta', clear: () => setFilters({ accountId: null }) })
 
   let lastMonth = ''
   let lastDay = ''
@@ -79,7 +84,13 @@ export function Transactions() {
             </button>
           </span>
         ))}
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar" enterKeyHint="search" aria-label="Buscar movimientos" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar"
+          enterKeyHint="search"
+          aria-label="Buscar movimientos"
+        />
         {query ? (
           <button onClick={() => setQuery('')} aria-label="Borrar búsqueda">
             <X size={18} />
@@ -93,7 +104,11 @@ export function Transactions() {
 
       {shown.length === 0 ? (
         filters.review ? (
-          <Empty art={<ArtCheck />} title="Todo revisado" text="Lo que importes o se cobre solo (recurrentes) aparece aquí para que lo confirmes." />
+          <Empty
+            art={<ArtCheck />}
+            title="Todo revisado"
+            text="Lo que importes o se cobre solo (recurrentes) aparece aquí para que lo confirmes."
+          />
         ) : q || chips.length ? (
           <Empty art={<ArtReceipt />} title="Nada por aquí" text="No hay movimientos con esa búsqueda o filtro.">
             <button className="btn small" onClick={() => (setQuery(''), setFilters(NO_FILTERS))}>
@@ -101,7 +116,11 @@ export function Transactions() {
             </button>
           </Empty>
         ) : (
-          <Empty art={<ArtReceipt />} title="Tu primer movimiento" text="Registra un gasto con el botón + o importa el extracto de tu banco en CSV.">
+          <Empty
+            art={<ArtReceipt />}
+            title="Tu primer movimiento"
+            text="Registra un gasto con el botón + o importa el extracto de tu banco en CSV."
+          >
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn primary small" onClick={() => openSheet({ name: 'tx' })}>
                 Agregar

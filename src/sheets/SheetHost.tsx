@@ -1,5 +1,5 @@
 import { useUI } from '../store'
-import { useSheetEffects } from '../components/Sheet'
+import { SheetCtx, useSheetEffects } from '../components/Sheet'
 import { TransactionSheet } from './TransactionSheet'
 import { CategoriesManageSheet, CategoryEditSheet, CategorySheet } from './CategorySheets'
 import { RecurringEditSheet, RecurringSheet } from './RecurringSheets'
@@ -7,6 +7,7 @@ import { AccountEditSheet, AccountSheet } from './AccountSheets'
 import { FiltersSheet, MonthSheet } from './MiscSheets'
 import { SettingsSheet } from './SettingsSheet'
 import { ImportSheet } from './ImportSheet'
+import { AuthSheet } from './AuthSheet'
 import type { Sheet } from '../store'
 
 function render(s: Sheet) {
@@ -35,6 +36,8 @@ function render(s: Sheet) {
       return <SettingsSheet />
     case 'import':
       return <ImportSheet />
+    case 'auth':
+      return <AuthSheet />
   }
 }
 
@@ -42,13 +45,16 @@ function render(s: Sheet) {
 export function SheetHost() {
   const sheets = useUI((s) => s.sheets)
   const close = useUI((s) => s.closeSheet)
-  useSheetEffects(sheets.length > 0, close)
+  useSheetEffects(
+    sheets.some((s) => !s.closing),
+    close,
+  )
 
   return (
     <>
       {sheets.map((s, i) => (
-        <div key={`${i}-${s.name}`} style={{ position: 'relative', zIndex: 40 + i }}>
-          {render(s)}
+        <div key={s.key} style={{ position: 'relative', zIndex: 40 + i }}>
+          <SheetCtx.Provider value={{ closing: !!s.closing, index: i }}>{render(s)}</SheetCtx.Provider>
         </div>
       ))}
     </>

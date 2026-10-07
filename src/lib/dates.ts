@@ -48,9 +48,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 export function monthLabel(month: string, locale: string, withYear = true): string {
   const d = parseISO(`${month}-01`)
   const sameYear = month.slice(0, 4) === currentMonth().slice(0, 4)
-  return cap(
-    d.toLocaleDateString(locale, withYear && !sameYear ? { month: 'long', year: 'numeric' } : { month: 'long' }),
-  )
+  return cap(d.toLocaleDateString(locale, withYear && !sameYear ? { month: 'long', year: 'numeric' } : { month: 'long' }))
 }
 
 export function shortMonthLabel(month: string, locale: string): string {

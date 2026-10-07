@@ -7,6 +7,9 @@ import { normalizeMerchant } from './lib/rules'
 import { currentMonth, todayISO } from './lib/dates'
 import { uid } from './lib/id'
 
+export type Undo = () => void
+const noop: Undo = () => {}
+
 export type TxInput = Omit<Transaction, 'id' | 'createdAt' | 'reviewed'> & { reviewed?: boolean }
 
 export interface Data {
@@ -24,17 +27,22 @@ export interface Data {
 
 interface Actions {
   start(mode: 'empty' | 'demo'): void
+  /** Cierra el onboarding con lo que la persona armó: sus cuentas, saldos y presupuestos. */
+  completeOnboarding(o: { name: string; accounts: Account[]; budgets: Record<string, number> }): void
   addTransaction(input: TxInput): void
   updateTransaction(id: string, patch: Partial<TxInput>): void
   deleteTransaction(id: string): void
+  /** Devuelve movimientos borrados (deshacer). */
+  restoreTransactions(txs: Transaction[]): void
   setReviewed(ids: string[], reviewed?: boolean): void
   importTransactions(rows: TxInput[]): { added: number; skipped: number }
   upsertCategory(c: Category): void
-  deleteCategory(id: string): void
+  /** Los borrados devuelven cómo deshacerlos (para el aviso con "Deshacer"). */
+  deleteCategory(id: string): Undo
   upsertAccount(a: Account): void
-  deleteAccount(id: string): void
+  deleteAccount(id: string): Undo
   upsertRecurring(r: Recurring): void
-  deleteRecurring(id: string): void
+  deleteRecurring(id: string): Undo
   processRecurrings(today?: string): number
   setSettings(patch: Partial<Settings>): void
   restore(data: Data): void
@@ -77,6 +85,19 @@ export const useStore = create<Data & Actions>()(
         }
       },
 
+      completeOnboarding({ name, accounts, budgets }) {
+        set((s) => ({
+          onboarded: true,
+          demo: false,
+          settings: { ...s.settings, name },
+          accounts: accounts.length ? accounts : DEFAULT_ACCOUNTS,
+          categories: DEFAULT_CATEGORIES.map((c) => ({ ...c, budget: budgets[c.id] || null })),
+          transactions: [],
+          recurrings: [],
+          merchantRules: {},
+        }))
+      },
+
       addTransaction(input) {
         const tx: Transaction = { reviewed: true, ...input, id: uid(), createdAt: Date.now() }
         set((s) => ({ transactions: [tx, ...s.transactions], merchantRules: learn(s.merchantRules, tx) }))
@@ -98,6 +119,13 @@ export const useStore = create<Data & Actions>()(
 
       deleteTransaction(id) {
         set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }))
+      },
+
+      restoreTransactions(txs) {
+        set((s) => {
+          const have = new Set(s.transactions.map((t) => t.id))
+          return { transactions: [...txs.filter((t) => !have.has(t.id)), ...s.transactions] }
+        })
       },
 
       setReviewed(ids, reviewed = true) {
@@ -138,15 +166,33 @@ export const useStore = create<Data & Actions>()(
       },
 
       deleteCategory(id) {
-        const cat = get().categories.find((c) => c.id === id)
-        if (!cat || id === FALLBACK_CATEGORY.expense || id === FALLBACK_CATEGORY.income) return
+        const before = get()
+        const cat = before.categories.find((c) => c.id === id)
+        if (!cat || id === FALLBACK_CATEGORY.expense || id === FALLBACK_CATEGORY.income) return noop
         const fallback = FALLBACK_CATEGORY[cat.kind]
+        const index = before.categories.indexOf(cat)
+        const txIds = new Set(before.transactions.filter((t) => t.categoryId === id).map((t) => t.id))
+        const recIds = new Set(before.recurrings.filter((r) => r.categoryId === id).map((r) => r.id))
+        const rules = Object.fromEntries(Object.entries(before.merchantRules).filter(([, v]) => v === id))
         set((s) => ({
           categories: s.categories.filter((c) => c.id !== id),
           transactions: s.transactions.map((t) => (t.categoryId === id ? { ...t, categoryId: fallback } : t)),
           recurrings: s.recurrings.map((r) => (r.categoryId === id ? { ...r, categoryId: fallback } : r)),
           merchantRules: Object.fromEntries(Object.entries(s.merchantRules).filter(([, v]) => v !== id)),
         }))
+        // Deshacer devuelve la categoría a su lugar y solo a los movimientos que eran suyos
+        return () =>
+          set((s) => {
+            if (s.categories.some((c) => c.id === id)) return {}
+            const categories = [...s.categories]
+            categories.splice(Math.min(index, categories.length), 0, cat)
+            return {
+              categories,
+              transactions: s.transactions.map((t) => (txIds.has(t.id) && t.categoryId === fallback ? { ...t, categoryId: id } : t)),
+              recurrings: s.recurrings.map((r) => (recIds.has(r.id) && r.categoryId === fallback ? { ...r, categoryId: id } : r)),
+              merchantRules: { ...s.merchantRules, ...rules },
+            }
+          })
       },
 
       upsertAccount(a) {
@@ -157,11 +203,27 @@ export const useStore = create<Data & Actions>()(
       },
 
       deleteAccount(id) {
+        const before = get()
+        const account = before.accounts.find((a) => a.id === id)
+        if (!account) return noop
+        const index = before.accounts.indexOf(account)
+        const txs = before.transactions.filter((t) => t.accountId === id || t.toAccountId === id)
+        const recs = before.recurrings.filter((r) => r.accountId === id)
         set((s) => ({
           accounts: s.accounts.filter((a) => a.id !== id),
           transactions: s.transactions.filter((t) => t.accountId !== id && t.toAccountId !== id),
           recurrings: s.recurrings.filter((r) => r.accountId !== id),
         }))
+        return () => {
+          set((s) => {
+            if (s.accounts.some((a) => a.id === id)) return {}
+            const accounts = [...s.accounts]
+            accounts.splice(Math.min(index, accounts.length), 0, account)
+            const haveRec = new Set(s.recurrings.map((r) => r.id))
+            return { accounts, recurrings: [...s.recurrings, ...recs.filter((r) => !haveRec.has(r.id))] }
+          })
+          get().restoreTransactions(txs)
+        }
       },
 
       upsertRecurring(r) {
@@ -173,7 +235,18 @@ export const useStore = create<Data & Actions>()(
       },
 
       deleteRecurring(id) {
-        set((s) => ({ recurrings: s.recurrings.filter((r) => r.id !== id) }))
+        const before = get().recurrings
+        const r = before.find((x) => x.id === id)
+        if (!r) return noop
+        const index = before.indexOf(r)
+        set((s) => ({ recurrings: s.recurrings.filter((x) => x.id !== id) }))
+        return () =>
+          set((s) => {
+            if (s.recurrings.some((x) => x.id === id)) return {}
+            const recurrings = [...s.recurrings]
+            recurrings.splice(Math.min(index, recurrings.length), 0, r)
+            return { recurrings }
+          })
       },
 
       processRecurrings(today = todayISO()) {
@@ -261,6 +334,7 @@ export type Sheet =
   | { name: 'month' }
   | { name: 'settings' }
   | { name: 'import' }
+  | { name: 'auth' }
 
 export interface TxFilters {
   type: 'all' | 'expense' | 'income' | 'transfer'
@@ -271,9 +345,16 @@ export interface TxFilters {
 
 export const NO_FILTERS: TxFilters = { type: 'all', review: false, categoryId: null, accountId: null }
 
+/** Hoja abierta: `key` estable y `closing` mientras corre la animación de salida. */
+export type SheetEntry = Sheet & { key: string; closing?: boolean }
+
+export const SHEET_EXIT_MS = 280
+
+const prefersReducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+
 interface UI {
   tab: Tab
-  sheets: Sheet[]
+  sheets: SheetEntry[]
   month: string
   filters: TxFilters
   setTab(tab: Tab): void
@@ -285,15 +366,28 @@ interface UI {
   setFilters(f: Partial<TxFilters>): void
 }
 
-export const useUI = create<UI>()((set) => ({
+export const useUI = create<UI>()((set, get) => ({
   tab: 'dashboard',
   sheets: [],
   month: currentMonth(),
   filters: NO_FILTERS,
   setTab: (tab) => set({ tab }),
-  openSheet: (sheet) => set((s) => ({ sheets: [...s.sheets, sheet] })),
-  closeSheet: () => set((s) => ({ sheets: s.sheets.slice(0, -1) })),
-  closeAll: () => set({ sheets: [] }),
+  openSheet: (sheet) => set((s) => ({ sheets: [...s.sheets, { ...sheet, key: uid() }] })),
+  // Cerrar no desmonta de una: marca `closing`, deja correr la animación y luego la quita
+  closeSheet: () => {
+    const top = [...get().sheets].reverse().find((x) => !x.closing)
+    if (!top) return
+    if (prefersReducedMotion()) return set((s) => ({ sheets: s.sheets.filter((x) => x.key !== top.key) }))
+    set((s) => ({ sheets: s.sheets.map((x) => (x.key === top.key ? { ...x, closing: true } : x)) }))
+    setTimeout(() => set((s) => ({ sheets: s.sheets.filter((x) => x.key !== top.key) })), SHEET_EXIT_MS)
+  },
+  closeAll: () => {
+    const keys = new Set(get().sheets.map((x) => x.key))
+    if (!keys.size) return
+    if (prefersReducedMotion()) return set({ sheets: [] })
+    set((s) => ({ sheets: s.sheets.map((x) => ({ ...x, closing: true })) }))
+    setTimeout(() => set((s) => ({ sheets: s.sheets.filter((x) => !keys.has(x.key)) })), SHEET_EXIT_MS)
+  },
   setMonth: (month) => set({ month }),
   setFilters: (f) => set((s) => ({ filters: { ...s.filters, ...f } })),
 }))

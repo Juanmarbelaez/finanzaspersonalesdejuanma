@@ -1,16 +1,18 @@
-import { useEffect, useLayoutEffect, useRef, type TouchEvent } from "react";
-import { FileUp, Plus, Settings2, SlidersHorizontal, X } from "lucide-react";
-import { TABS, useStore, useUI, type Tab } from "./store";
-import { useToast } from "./hooks";
-import { haptic } from "./lib/haptic";
-import { Dashboard } from "./screens/Dashboard";
-import { Transactions } from "./screens/Transactions";
-import { Categories } from "./screens/Categories";
-import { Recurrings } from "./screens/Recurrings";
-import { CashFlow } from "./screens/CashFlow";
-import { Accounts } from "./screens/Accounts";
-import { Welcome } from "./screens/Welcome";
-import { SheetHost } from "./sheets/SheetHost";
+import { useEffect, useLayoutEffect, useRef, type TouchEvent } from 'react'
+import { Check, FileUp, Plus, Settings2, SlidersHorizontal, X } from 'lucide-react'
+import { TABS, useStore, useUI, type Tab } from './store'
+import { useMonthMood, useResolvedTheme, useScrolled, useToast } from './hooks'
+import { haptic } from './lib/haptic'
+import { Dashboard } from './screens/Dashboard'
+import { Transactions } from './screens/Transactions'
+import { Categories } from './screens/Categories'
+import { Recurrings } from './screens/Recurrings'
+import { CashFlow } from './screens/CashFlow'
+import { Accounts } from './screens/Accounts'
+import { Welcome } from './screens/Welcome'
+import { SheetHost } from './sheets/SheetHost'
+import { DialogHost, ask } from './components/Dialog'
+import { startCloud } from './lib/cloud'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
   dashboard: Dashboard,
@@ -19,54 +21,51 @@ const SCREENS: Record<Tab, () => React.JSX.Element> = {
   recurrings: Recurrings,
   cashflow: CashFlow,
   accounts: Accounts,
-};
+}
 
 function TabPills() {
-  const tab = useUI((s) => s.tab);
-  const setTab = useUI((s) => s.setTab);
-  const ref = useRef<HTMLDivElement>(null);
+  const tab = useUI((s) => s.tab)
+  const setTab = useUI((s) => s.setTab)
+  const ref = useRef<HTMLDivElement>(null)
 
   // La pestaña activa siempre queda a la vista, centrada
   useEffect(() => {
-    const el = ref.current?.querySelector<HTMLButtonElement>("button.active");
+    const el = ref.current?.querySelector<HTMLButtonElement>('button.active')
     el?.scrollIntoView({
-      inline: "center",
-      block: "nearest",
-      behavior: "smooth",
-    });
-  }, [tab]);
+      inline: 'center',
+      block: 'nearest',
+      behavior: 'smooth',
+    })
+  }, [tab])
 
   return (
     <nav className="tabs" ref={ref} aria-label="Secciones">
       {TABS.map((t) => (
         <button
           key={t.id}
-          className={tab === t.id ? "active" : ""}
-          aria-current={tab === t.id ? "page" : undefined}
+          className={tab === t.id ? 'active' : ''}
+          aria-current={tab === t.id ? 'page' : undefined}
           onClick={() => setTab(t.id)}
         >
           {t.label}
         </button>
       ))}
     </nav>
-  );
+  )
 }
 
 function Fab() {
-  const tab = useUI((s) => s.tab);
-  const openSheet = useUI((s) => s.openSheet);
+  const tab = useUI((s) => s.tab)
+  const openSheet = useUI((s) => s.openSheet)
   const add = () => {
-    if (tab === "recurrings") openSheet({ name: "recurringEdit" });
-    else if (tab === "accounts") openSheet({ name: "accountEdit" });
-    else openSheet({ name: "tx" });
-  };
+    if (tab === 'recurrings') openSheet({ name: 'recurringEdit' })
+    else if (tab === 'accounts') openSheet({ name: 'accountEdit' })
+    else openSheet({ name: 'tx' })
+  }
   return (
     <div className="fab">
-      {tab === "categories" && (
-        <button
-          onClick={() => openSheet({ name: "categoriesManage" })}
-          aria-label="Editar categorías"
-        >
+      {tab === 'categories' && (
+        <button onClick={() => openSheet({ name: 'categoriesManage' })} aria-label="Editar categorías">
           <SlidersHorizontal size={20} />
         </button>
       )}
@@ -74,132 +73,160 @@ function Fab() {
         <Plus size={24} />
       </button>
     </div>
-  );
+  )
 }
 
+/** Aviso tipo HUD de iOS: baja desde arriba, junto a la isla dinámica. */
 function Toast() {
-  const message = useToast((s) => s.message);
-  return message ? (
-    <div className="toast" role="status">
-      {message}
+  const { message, action, n, hide } = useToast()
+  if (!message) return null
+  return (
+    <div className="toast" role="status" key={n}>
+      <span className="toast-dot" aria-hidden>
+        <Check size={13} strokeWidth={3.2} />
+      </span>
+      <span>{message}</span>
+      {action && (
+        <button
+          className="toast-action"
+          onClick={() => {
+            haptic()
+            action.run()
+            hide()
+          }}
+        >
+          {action.label}
+        </button>
+      )}
     </div>
-  ) : null;
+  )
 }
 
 /** Deslizar a los lados cambia de pestaña, como en Copilot (sin pelear con los carruseles). */
 function useSwipeTabs() {
-  const start = useRef<{ x: number; y: number; t: number } | null>(null);
+  const start = useRef<{ x: number; y: number; t: number } | null>(null)
   const onTouchStart = (e: TouchEvent) => {
-    const target = e.target as HTMLElement;
-    if (
-      target.closest(
-        ".rings, .upcoming, .acct-scroll, .tabs, .chart, input, select, .suggest",
-      )
-    ) {
-      start.current = null;
-      return;
+    const target = e.target as HTMLElement
+    if (target.closest('.rings, .upcoming, .acct-scroll, .tabs, .chart, input, select, .suggest')) {
+      start.current = null
+      return
     }
     start.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
       t: Date.now(),
-    };
-  };
-  const onTouchEnd = (e: TouchEvent) => {
-    const s = start.current;
-    start.current = null;
-    if (!s || useUI.getState().sheets.length) return;
-    const dx = e.changedTouches[0].clientX - s.x;
-    const dy = e.changedTouches[0].clientY - s.y;
-    if (Math.abs(dx) < 70 || Math.abs(dy) > 50 || Date.now() - s.t > 600)
-      return;
-    const { tab, setTab } = useUI.getState();
-    const i = TABS.findIndex((t) => t.id === tab);
-    const next = TABS[i + (dx < 0 ? 1 : -1)];
-    if (next) {
-      haptic();
-      setTab(next.id);
     }
-  };
-  return { onTouchStart, onTouchEnd };
+  }
+  const onTouchEnd = (e: TouchEvent) => {
+    const s = start.current
+    start.current = null
+    if (!s || useUI.getState().sheets.some((x) => !x.closing)) return
+    const dx = e.changedTouches[0].clientX - s.x
+    const dy = e.changedTouches[0].clientY - s.y
+    if (Math.abs(dx) < 70 || Math.abs(dy) > 50 || Date.now() - s.t > 600) return
+    const { tab, setTab } = useUI.getState()
+    const i = TABS.findIndex((t) => t.id === tab)
+    const next = TABS[i + (dx < 0 ? 1 : -1)]
+    if (next) {
+      haptic()
+      setTab(next.id)
+    }
+  }
+  return { onTouchStart, onTouchEnd }
 }
 
 export function App() {
-  const onboarded = useStore((s) => s.onboarded);
-  const theme = useStore((s) => s.settings.theme);
-  const demo = useStore((s) => s.demo);
-  const tab = useUI((s) => s.tab);
-  const openSheet = useUI((s) => s.openSheet);
-  const sheetOpen = useUI((s) => s.sheets.length > 0);
-  const appRef = useRef<HTMLDivElement>(null);
-  const swipe = useSwipeTabs();
+  const onboarded = useStore((s) => s.onboarded)
+  const theme = useStore((s) => s.settings.theme)
+  const demo = useStore((s) => s.demo)
+  const tab = useUI((s) => s.tab)
+  const openSheet = useUI((s) => s.openSheet)
+  const sheetOpen = useUI((s) => s.sheets.some((x) => !x.closing))
+  const appRef = useRef<HTMLDivElement>(null)
+  const swipe = useSwipeTabs()
+  const scrolled = useScrolled()
+  const mood = useMonthMood()
+  const resolved = useResolvedTheme(theme)
+  const name = useStore((s) => s.settings.name.trim())
+
+  // La nube arranca después de pintar: la app abre al instante con lo del teléfono
+  useEffect(() => {
+    const id = setTimeout(() => startCloud(), 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  // Cada quien tiene su app: "Plata de Juanma", "Plata de Mamá"… (también al agregarla al inicio)
+  useEffect(() => {
+    const title = name ? `Plata de ${name}` : 'Plata'
+    document.title = title
+    document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', title)
+  }, [name])
 
   // Efecto de hoja de iOS: la pantalla de atrás se encoge desde lo que estás viendo
   useLayoutEffect(() => {
-    if (sheetOpen && appRef.current)
-      appRef.current.style.transformOrigin = `50% ${window.scrollY + 40}px`;
-  }, [sheetOpen]);
+    if (sheetOpen && appRef.current) appRef.current.style.transformOrigin = `50% ${window.scrollY + 40}px`
+  }, [sheetOpen])
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
+    document.documentElement.dataset.theme = resolved
+  }, [resolved])
 
   // Los pagos recurrentes que ya vencieron se registran solos al abrir la app
   useEffect(() => {
-    const run = () =>
-      document.visibilityState === "visible" &&
-      useStore.getState().processRecurrings();
-    run();
-    document.addEventListener("visibilitychange", run);
-    return () => document.removeEventListener("visibilitychange", run);
-  }, [onboarded]);
+    const run = () => document.visibilityState === 'visible' && useStore.getState().processRecurrings()
+    run()
+    document.addEventListener('visibilitychange', run)
+    return () => document.removeEventListener('visibilitychange', run)
+  }, [onboarded])
 
   useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, [tab]);
+    window.scrollTo({ top: 0 })
+  }, [tab])
 
-  if (!onboarded) return <Welcome />;
+  if (!onboarded)
+    return (
+      <>
+        <Welcome />
+        <DialogHost />
+      </>
+    )
 
-  const Screen = SCREENS[tab];
+  const Screen = SCREENS[tab]
+
+  const exitDemo = async () => {
+    const ok = await ask({
+      title: 'Salir del modo demo',
+      message: 'Se borran los datos de ejemplo y empiezas con los tuyos.',
+      confirm: 'Borrar datos de ejemplo',
+      destructive: true,
+    })
+    if (ok) useStore.getState().resetAll()
+  }
 
   return (
     <>
-      <div className={`app ${sheetOpen ? "pushed" : ""}`} ref={appRef}>
+      <div className={`app ${sheetOpen ? 'pushed' : ''} ${demo ? 'demo' : ''}`} data-mood={mood} ref={appRef}>
+        {/* Luz de arriba: el color dice cómo va el mes */}
+        <div className="sky" aria-hidden />
         {demo && (
           <div className="demo-banner">
             Estás en modo demo
-            <button
-              aria-label="Salir del modo demo"
-              onClick={() => {
-                if (
-                  confirm(
-                    "Salir del modo demo borra los datos de ejemplo para que empieces con los tuyos. ¿Seguir?",
-                  )
-                )
-                  useStore.getState().resetAll();
-              }}
-            >
-              <X size={18} />
+            <button aria-label="Salir del modo demo" onClick={exitDemo}>
+              <X size={16} strokeWidth={2.4} />
             </button>
           </div>
         )}
-        <header className="app-header">
+        <header className={`app-header ${scrolled ? 'scrolled' : ''}`}>
           <div className="title-row">
-            <button
-              className="hbtn"
-              onClick={() => openSheet({ name: "settings" })}
-              aria-label="Ajustes"
-            >
+            <button className="hbtn" onClick={() => openSheet({ name: 'settings' })} aria-label="Ajustes">
               <Settings2 size={21} />
             </button>
             <h1 className="wordmark">
-              Plata de Juanma<i>.</i>
+              <b>Plata</b>
+              {name ? ` de ${name}` : ''}
+              <i>.</i>
             </h1>
-            <button
-              className="hbtn"
-              onClick={() => openSheet({ name: "import" })}
-              aria-label="Importar extracto"
-            >
+            <button className="hbtn" onClick={() => openSheet({ name: 'import' })} aria-label="Importar extracto">
               <FileUp size={21} />
             </button>
           </div>
@@ -211,7 +238,8 @@ export function App() {
         <Fab />
       </div>
       <SheetHost />
+      <DialogHost />
       <Toast />
     </>
-  );
+  )
 }

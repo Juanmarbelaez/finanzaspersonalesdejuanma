@@ -10,7 +10,7 @@ export const TxRow = memo(function TxRow({ tx }: { tx: Transaction }) {
   const openSheet = useUI((s) => s.openSheet)
   const cat = tx.categoryId ? cats.get(tx.categoryId) : undefined
   const isTransfer = tx.type === 'transfer'
-  // Recién guardada: destello de confirmación (feedback visible, no solo un toast)
+  // Recién guardada: destello de confirmación, además del toast
   const fresh = Date.now() - tx.createdAt < 4000
 
   return (
