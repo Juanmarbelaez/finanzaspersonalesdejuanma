@@ -20,9 +20,10 @@ import { Logo } from '../components/Logo'
  * - Errores que dicen cómo arreglarlo.
  */
 
-type Step = 'intro' | 'signup' | 'login' | 'forgot' | 'confirm' | 'accounts' | 'budget' | 'done'
+type Step = 'intro' | 'signup' | 'login' | 'forgot' | 'confirm' | 'accounts' | 'budget' | 'building' | 'done'
+type Ask = 'name' | 'hello' | 'email' | 'password'
 
-const PROGRESS: Partial<Record<Step, number>> = { signup: 1, login: 1, forgot: 1, confirm: 1, accounts: 2, budget: 3, done: 4 }
+const PROGRESS: Partial<Record<Step, number>> = { signup: 1, login: 1, forgot: 1, confirm: 1, accounts: 2, budget: 3, building: 4, done: 4 }
 const TOTAL = 4
 
 interface Option {
@@ -110,6 +111,8 @@ function PasswordField({ value, onChange, autoComplete }: { value: string; onCha
 export function Welcome() {
   const status = useAuth((s) => s.status)
   const [step, setStep] = useState<Step>('intro')
+  // Crear cuenta va de a una pregunta por pantalla (como Bevel)
+  const [ask, setAsk] = useState<Ask>('name')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -170,6 +173,15 @@ export function Welcome() {
     }
   }
 
+  const askReady = ask === 'name' ? !!name.trim() : ask === 'hello' ? true : ask === 'email' ? validEmail : password.length >= 8
+
+  const next = () => {
+    if (ask === 'name') return name.trim() ? (haptic(), setAsk('hello')) : fail('Escribe tu nombre: así se llamará tu app.')
+    if (ask === 'hello') return setAsk('email')
+    if (ask === 'email') return validEmail ? setAsk('password') : fail('Ese correo no se ve bien. Revisa que tenga @ y un punto.')
+    submit()
+  }
+
   const total = useMemo(() => Object.values(budgets).reduce((a, b) => a + b, 0), [budgets])
   const displayName = name.trim() || (useStore.getState().settings.name ?? '')
 
@@ -181,6 +193,12 @@ export function Welcome() {
     })
     useStore.getState().completeOnboarding({ name: displayName, accounts, budgets })
     saveNow()
+  }
+
+  // Un momento corto de "armando": se siente que la app se prepara para ti
+  const build = () => {
+    go('building')
+    setTimeout(() => setStep((s) => (s === 'building' ? 'done' : s)), 1500)
   }
 
   const toggleAccount = (key: string) => {
@@ -209,7 +227,22 @@ export function Welcome() {
     <div className="onboarding">
       <div className="sky" aria-hidden />
       <div className="ob-top">
-        {['signup', 'login', 'forgot', 'confirm'].includes(step) && back(step === 'forgot' ? 'login' : 'intro')}
+        {step === 'signup' && (
+          <button
+            className="ob-back"
+            onClick={() => {
+              setError(null)
+              const prev: Record<Ask, Ask | null> = { name: null, hello: 'name', email: 'hello', password: 'email' }
+              const p = prev[ask]
+              if (p) setAsk(p)
+              else go('intro')
+            }}
+            aria-label="Atrás"
+          >
+            <ArrowLeft size={20} />
+          </button>
+        )}
+        {['login', 'forgot', 'confirm'].includes(step) && back(step === 'forgot' ? 'login' : 'intro')}
         {step === 'budget' && back('accounts')}
         <Progress step={step} />
       </div>
@@ -274,7 +307,92 @@ export function Welcome() {
         </div>
       )}
 
-      {(step === 'signup' || step === 'login' || step === 'forgot') && (
+      {step === 'signup' && (
+        <form
+          className="ob-step ob-ask"
+          key={ask}
+          onSubmit={(e) => {
+            e.preventDefault()
+            next()
+          }}
+        >
+          {ask === 'hello' ? (
+            <div className="ob-center">
+              <Mascot pose="success" size={170} className="ob-mascot center" />
+              <h2 className="ob-title center">Encantado, {name.trim()}.</h2>
+              <p className="ob-sub center">
+                Tu app se va a llamar <b>Plata</b> de {name.trim()}. Ahora creamos tu cuenta para que tus datos queden guardados.
+              </p>
+            </div>
+          ) : (
+            <div className="ob-center">
+              <h2 className="ob-q">
+                {ask === 'name' ? '¿Cómo te llamas?' : ask === 'email' ? '¿Cuál es tu correo?' : 'Crea una contraseña'}
+              </h2>
+              <div className="ob-big">
+                {ask === 'name' && (
+                  <input
+                    autoFocus
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="Juanma"
+                    autoComplete="given-name"
+                    enterKeyHint="next"
+                  />
+                )}
+                {ask === 'email' && (
+                  <input
+                    autoFocus
+                    type="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="tu@correo.com"
+                    enterKeyHint="next"
+                  />
+                )}
+                {ask === 'password' && (
+                  <input
+                    autoFocus
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="Mínimo 8 caracteres"
+                    enterKeyHint="done"
+                  />
+                )}
+              </div>
+              {ask === 'email' && <p className="ob-hint">Lo usas para entrar desde cualquier iPhone o computador.</p>}
+              {ask === 'password' && <p className="ob-hint">Solo tú ves tus datos. Nadie más tiene acceso.</p>}
+            </div>
+          )}
+          {errorLine}
+          <div className="ob-actions">
+            <button className={`ob-primary ${askReady ? '' : 'muted'}`} type="submit" disabled={busy}>
+              {busy ? <span className="spinner" aria-label="Cargando" /> : 'Continuar'}
+            </button>
+            {ask === 'name' && (
+              <button type="button" className="ob-link" onClick={() => go('login')}>
+                Ya tengo cuenta
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+
+      {(step === 'login' || step === 'forgot') && (
         <form
           className="ob-step"
           key={step}
@@ -283,31 +401,11 @@ export function Welcome() {
             submit()
           }}
         >
-          <h2 className="ob-title">
-            {step === 'signup' ? 'Crea tu cuenta' : step === 'login' ? 'Hola de nuevo' : 'Recupera tu contraseña'}
-          </h2>
+          <h2 className="ob-title">{step === 'login' ? 'Hola de nuevo' : 'Recupera tu contraseña'}</h2>
           <p className="ob-sub">
-            {step === 'signup'
-              ? 'Tus datos quedan guardados en la nube y solo tú los ves. Entras desde cualquier iPhone.'
-              : step === 'login'
-                ? 'Entra con tu correo y tu contraseña.'
-                : 'Te mandamos un enlace al correo para crear una nueva.'}
+            {step === 'login' ? 'Entra con tu correo y tu contraseña.' : 'Te mandamos un enlace al correo para crear una nueva.'}
           </p>
           <div className="ob-card">
-            {step === 'signup' && (
-              <label className="ob-field">
-                <span>Nombre</span>
-                <input
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    setError(null)
-                  }}
-                  placeholder="Juanma"
-                  autoComplete="given-name"
-                />
-              </label>
-            )}
             <label className="ob-field">
               <span>Correo</span>
               <input
@@ -323,43 +421,25 @@ export function Welcome() {
                 autoCapitalize="none"
               />
             </label>
-            {step !== 'forgot' && (
+            {step === 'login' && (
               <PasswordField
                 value={password}
                 onChange={(v) => {
                   setPassword(v)
                   setError(null)
                 }}
-                autoComplete={step === 'signup' ? 'new-password' : 'current-password'}
+                autoComplete="current-password"
               />
             )}
           </div>
-          {step === 'signup' && name.trim() && (
-            <p className="ob-preview">
-              Tu app se va a llamar <b>Plata</b> de {name.trim()}
-            </p>
-          )}
           {errorLine}
           <div className="ob-actions">
             <button className="ob-primary" type="submit" disabled={busy}>
-              {busy ? (
-                <span className="spinner" aria-label="Cargando" />
-              ) : step === 'signup' ? (
-                'Continuar'
-              ) : step === 'login' ? (
-                'Entrar'
-              ) : (
-                'Enviar enlace'
-              )}
+              {busy ? <span className="spinner" aria-label="Cargando" /> : step === 'login' ? 'Entrar' : 'Enviar enlace'}
             </button>
             {step === 'login' && (
               <button type="button" className="ob-link" onClick={() => go('forgot')}>
                 Olvidé mi contraseña
-              </button>
-            )}
-            {step === 'signup' && (
-              <button type="button" className="ob-link" onClick={() => go('login')}>
-                Ya tengo cuenta
               </button>
             )}
           </div>
@@ -447,19 +527,27 @@ export function Welcome() {
             ))}
           </div>
           <div className="ob-actions">
-            <button className="ob-primary" onClick={() => go('done')}>
+            <button className="ob-primary" onClick={() => build()}>
               Usar este presupuesto
             </button>
             <button
               className="ob-link"
               onClick={() => {
                 setBudgets({})
-                go('done')
+                build()
               }}
             >
               Lo armo después
             </button>
           </div>
+        </div>
+      )}
+
+      {step === 'building' && (
+        <div className="ob-step ob-center" key="building">
+          <div className="ob-ring" aria-hidden />
+          <h2 className="ob-q">Armando tu plata…</h2>
+          <p className="ob-sub center">Tus cuentas, tu presupuesto y tu mes.</p>
         </div>
       )}
 
