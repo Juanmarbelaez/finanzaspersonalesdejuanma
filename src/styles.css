@@ -465,7 +465,9 @@ textarea {
 }
 
 .app.demo {
-  background: linear-gradient(#000 0 calc(var(--safe-top) + 64px), transparent 0) no-repeat;
+  background:
+    linear-gradient(#000 0 calc(var(--safe-top) + 64px), transparent 0) no-repeat,
+    var(--bg);
 }
 
 .app.demo .sky {
@@ -3511,4 +3513,40 @@ button.amount-big {
   .tx-row:hover {
     background: var(--tag-bg);
   }
+}
+
+/*
+ * Rebote de iOS al estirar: lo que se ve por fuera de la página es esta capa fija.
+ * Mitad de arriba color del cielo, mitad de abajo color de fondo. El cuerpo va
+ * transparente y la app pinta su propio fondo encima.
+ */
+html,
+body {
+  background: transparent;
+}
+
+html {
+  --ovs-top: #30593a;
+}
+
+:root[data-theme='light'] {
+  --ovs-top: #376642;
+}
+
+html:has(.app.demo) {
+  --ovs-top: #000;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: -50vh 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--ovs-top) 50%, var(--bg) 50%);
+}
+
+.app,
+.onboarding {
+  background-color: var(--bg);
 }
