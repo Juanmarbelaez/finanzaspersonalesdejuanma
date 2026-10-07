@@ -3105,17 +3105,45 @@ button.amount-big {
 /* ---------- Mascota ---------- */
 
 .mascot {
+  position: relative;
   display: block;
-  object-fit: contain;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   pointer-events: none;
 }
 
-/* Sobre negro el pelo y la camiseta se pierden: un borde de luz muy fino la separa del fondo */
-:root[data-theme='dark'] .mascot {
-  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55));
+.mascot img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Sombra suave de la silueta, con la luz desde arriba */
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.22));
+}
+
+/* Sombra de contacto: una elipse difusa bajo las zapatillas para que quede parado en el piso */
+.mascot::after {
+  content: '';
+  position: absolute;
+  left: 26%;
+  right: 26%;
+  bottom: 3.5%;
+  height: 7%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0));
+}
+
+/* Sobre negro el pelo y la camiseta se pierden: borde de luz fino + sombra más profunda */
+:root[data-theme='dark'] .mascot img {
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55)) drop-shadow(0 12px 16px rgba(0, 0, 0, 0.6));
+}
+
+:root[data-theme='dark'] .mascot::after {
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0));
+  height: 8%;
 }
 
 .mascot.enter {
@@ -3141,4 +3169,8 @@ button.amount-big {
 
 .ob-mascot.center {
   margin: 6vh auto 0;
+}
+
+.empty .mascot {
+  margin: 0 auto;
 }

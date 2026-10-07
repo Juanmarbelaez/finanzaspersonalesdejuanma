@@ -30,16 +30,18 @@ export function Mascot({
   decorative?: boolean
   className?: string
 }) {
+  // El span pinta la sombra de contacto bajo los pies; la imagen lleva la sombra de su silueta
   return (
-    <img
-      className={`mascot ${className}`}
-      src={`./moneymaxxer/${pose}.webp`}
-      width={size}
-      height={size}
-      alt={decorative ? '' : ALT[pose]}
-      aria-hidden={decorative || undefined}
-      decoding="async"
-      draggable={false}
-    />
+    <span className={`mascot ${className}`} style={{ width: size, height: size }}>
+      <img
+        src={`./moneymaxxer/${pose}.webp`}
+        width={size}
+        height={size}
+        alt={decorative ? '' : ALT[pose]}
+        aria-hidden={decorative || undefined}
+        decoding="async"
+        draggable={false}
+      />
+    </span>
   )
 }
