@@ -4241,3 +4241,8 @@ html.lg-refract .tabs .tab-lens {
   justify-content: space-between;
   padding: calc(env(safe-area-inset-top) + 18vh) 24px calc(env(safe-area-inset-bottom) + 24px);
 }
+
+/* Reenviar con cuenta regresiva */
+.ob-secondary.muted {
+  opacity: 0.55;
+}

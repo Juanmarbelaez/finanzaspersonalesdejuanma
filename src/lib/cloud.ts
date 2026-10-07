@@ -52,6 +52,29 @@ const writeMeta = (m: Partial<Meta>) => {
   }
 }
 
+/*
+ * Los enlaces del correo (confirmar cuenta, cambiar contraseña) abren la app en el navegador.
+ * En iPhone eso es Safari, que no comparte datos con la app instalada: hay que decirle a la
+ * persona qué pasó y que vuelva. Se lee antes de que Supabase limpie la URL.
+ */
+export type EmailLink = 'signup' | 'recovery' | 'expired' | null
+
+function readEmailLink(): EmailLink {
+  if (typeof location === 'undefined') return null
+  const p = new URLSearchParams(`${location.hash.slice(1)}&${location.search.slice(1)}`)
+  if (p.get('error_code') || p.get('error')) {
+    history.replaceState(null, '', location.pathname)
+    return 'expired'
+  }
+  if (!p.get('access_token') && !p.get('code')) return null
+  return p.get('type') === 'recovery' ? 'recovery' : 'signup'
+}
+
+export const emailLink: EmailLink = readEmailLink()
+
+/** A dónde vuelve el enlace del correo. Debe estar en Supabase → Authentication → URL Configuration. */
+const linkTarget = () => `${location.origin}/`
+
 let clientPromise: Promise<SupabaseClient> | null = null
 export function client(): Promise<SupabaseClient> {
   clientPromise ??= import('@supabase/supabase-js').then(({ createClient }) =>
@@ -239,6 +262,8 @@ const MESSAGES: Record<string, string> = {
   weak_password: 'La contraseña es muy débil: usa al menos 8 caracteres, con letras y números.',
   over_email_send_rate_limit: 'Se enviaron muchos correos seguidos. Espera un minuto y vuelve a intentar.',
   over_request_rate_limit: 'Demasiados intentos seguidos. Espera un minuto.',
+  otp_expired: 'Ese enlace ya venció o ya se usó. Pide uno nuevo.',
+  same_password: 'Esa es la misma contraseña de antes. Elige otra.',
 }
 
 /** Errores que dicen qué hacer, no "Error 400". */
@@ -263,7 +288,7 @@ export async function signUp(name: string, email: string, password: string): Pro
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { name }, emailRedirectTo: window.location.origin + window.location.pathname },
+    options: { data: { name }, emailRedirectTo: linkTarget() },
   })
   if (error) throw error
   // Con confirmación desactivada, un correo repetido vuelve sin identidades
@@ -282,7 +307,23 @@ export async function signIn(email: string, password: string): Promise<void> {
 
 export async function resetPassword(email: string): Promise<void> {
   const sb = await client()
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname })
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: linkTarget() })
+  if (error) throw error
+}
+
+/** Manda otra vez el correo para confirmar la cuenta. */
+export async function resendConfirmation(email: string): Promise<void> {
+  const sb = await client()
+  const { error } = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: linkTarget() } })
+  if (error) throw error
+}
+
+/** Nueva contraseña, con la sesión que abrió el enlace de recuperación. */
+export async function updatePassword(password: string): Promise<void> {
+  const sb = await client()
+  const { data } = await sb.auth.getSession()
+  if (!data.session) throw { code: 'otp_expired' }
+  const { error } = await sb.auth.updateUser({ password })
   if (error) throw error
 }
 

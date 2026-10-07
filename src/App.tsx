@@ -13,7 +13,9 @@ import { Accounts } from './screens/Accounts'
 import { Welcome } from './screens/Welcome'
 import { SheetHost } from './sheets/SheetHost'
 import { DialogHost, ask } from './components/Dialog'
-import { startCloud } from './lib/cloud'
+import { emailLink, startCloud } from './lib/cloud'
+import { isIOS, isStandalone } from './lib/download'
+import { EmailLinkScreen } from './screens/EmailLink'
 import { scroller } from './lib/scroller'
 import { Logo } from './components/Logo'
 
@@ -273,6 +275,9 @@ export function App() {
   const resolved = useResolvedTheme(theme)
   const name = useStore((s) => s.settings.name.trim())
 
+  // Enlace del correo: en computador o en la app instalada se sigue normal; en Safari del iPhone se avisa
+  const [link, setLink] = useState(() => (emailLink === 'signup' && !(isIOS() && !isStandalone()) ? null : emailLink))
+
   // La nube arranca después de pintar: la app abre al instante con lo del teléfono
   useEffect(() => {
     const id = setTimeout(() => startCloud(), 0)
@@ -306,6 +311,14 @@ export function App() {
   useEffect(() => {
     scroller().scrollTo({ top: 0 })
   }, [tab, onboarded])
+
+  if (link)
+    return (
+      <>
+        <EmailLinkScreen kind={link} onDone={() => setLink(null)} />
+        <DialogHost />
+      </>
+    )
 
   if (!onboarded)
     return (

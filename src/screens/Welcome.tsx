@@ -3,10 +3,10 @@ import { ArrowLeft, Check, Eye, EyeOff, Repeat, Share, SquarePlus, Target, Zap }
 import { useStore } from '../store'
 import { DEFAULT_CATEGORIES } from '../lib/seed'
 import { isIOS, isStandalone } from '../lib/download'
-import { haptic } from '../lib/haptic'
+import { haptic, hapticSuccess } from '../lib/haptic'
 import { scroller } from '../lib/scroller'
 import { uid } from '../lib/id'
-import { explain, resetPassword, saveNow, signIn, signUp, useAuth } from '../lib/cloud'
+import { explain, resendConfirmation, resetPassword, saveNow, signIn, signUp, useAuth } from '../lib/cloud'
 import type { Account } from '../lib/types'
 import { Money } from '../components/ui'
 import { Mascot } from '../components/Mascot'
@@ -85,7 +85,7 @@ function Progress({ step }: { step: Step }) {
   )
 }
 
-function PasswordField({ value, onChange, autoComplete }: { value: string; onChange(v: string): void; autoComplete: string }) {
+export function PasswordField({ value, onChange, autoComplete }: { value: string; onChange(v: string): void; autoComplete: string }) {
   const [show, setShow] = useState(false)
   return (
     <label className="ob-field">
@@ -122,6 +122,9 @@ export function Welcome() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<{ msg: string; n: number } | null>(null)
   const [busy, setBusy] = useState(false)
+  // "Revisa tu correo" sirve para confirmar la cuenta o para cambiar la contraseña
+  const [confirmFor, setConfirmFor] = useState<'signup' | 'reset'>('signup')
+  const [resendIn, setResendIn] = useState(0)
   const [picked, setPicked] = useState<Record<string, number | false>>({ bancolombia: 0, nequi: 0, efectivo: 0 })
   const [budgets, setBudgets] = useState<Record<string, number>>(SUGGESTED)
 
@@ -140,6 +143,66 @@ export function Welcome() {
     scroller().scrollTo({ top: 0 })
   }
 
+  // Mientras espera la confirmación: al volver a la app (después de tocar el enlace) entra sola
+  const waiting = step === 'confirm' && confirmFor === 'signup' && !!password
+  useEffect(() => {
+    if (!waiting) return
+    let trying = false
+    const tryIn = () => {
+      if (trying || document.visibilityState !== 'visible') return
+      trying = true
+      signIn(email.trim(), password)
+        .then(() => {
+          hapticSuccess()
+          if (!useStore.getState().onboarded) go('accounts')
+        })
+        .catch(() => {}) // Todavía sin confirmar: sigue esperando
+        .finally(() => (trying = false))
+    }
+    document.addEventListener('visibilitychange', tryIn)
+    window.addEventListener('focus', tryIn)
+    return () => {
+      document.removeEventListener('visibilitychange', tryIn)
+      window.removeEventListener('focus', tryIn)
+    }
+  }, [waiting, email, password])
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const id = setTimeout(() => setResendIn((n) => n - 1), 1000)
+    return () => clearTimeout(id)
+  }, [resendIn])
+
+  const checkConfirmed = async () => {
+    if (!password) return go('login')
+    setBusy(true)
+    try {
+      await signIn(email.trim(), password)
+      hapticSuccess()
+      if (!useStore.getState().onboarded) go('accounts')
+    } catch (e) {
+      const msg = explain(e)
+      fail(/confirmar/.test(msg) ? 'Todavía no aparece confirmado. Abre el enlace del correo y vuelve aquí.' : msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const resend = async () => {
+    if (resendIn > 0 || busy) return
+    setBusy(true)
+    try {
+      await resendConfirmation(email.trim())
+      haptic()
+      setError(null)
+      setResendIn(60)
+    } catch (e) {
+      fail(explain(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const validEmail = /^\S+@\S+\.\S+$/.test(email.trim())
 
   const submit = async () => {
@@ -150,6 +213,7 @@ export function Welcome() {
       setBusy(true)
       try {
         await resetPassword(email.trim())
+        setConfirmFor('reset')
         go('confirm')
       } catch (e) {
         fail(explain(e))
@@ -164,6 +228,8 @@ export function Welcome() {
       if (step === 'signup') {
         const r = await signUp(name.trim(), email.trim(), password)
         haptic()
+        setConfirmFor('signup')
+        setResendIn(60)
         go(r === 'confirm' ? 'confirm' : 'accounts')
       } else {
         await signIn(email.trim(), password)
@@ -172,7 +238,11 @@ export function Welcome() {
         if (!useStore.getState().onboarded) go('accounts')
       }
     } catch (e) {
-      fail(explain(e))
+      // Entró sin haber confirmado: se lleva a la pantalla que deja reenviar el correo
+      if (step === 'login' && (e as { code?: string })?.code === 'email_not_confirmed') {
+        setConfirmFor('signup')
+        go('confirm')
+      } else fail(explain(e))
     } finally {
       setBusy(false)
     }
@@ -503,13 +573,40 @@ export function Welcome() {
         <div className="ob-step" key="confirm">
           <Mascot pose="pointing" size={180} className="ob-mascot center" />
           <h2 className="ob-title center">Revisa tu correo</h2>
-          <p className="ob-sub center">
-            Te mandamos un enlace a <b>{email.trim()}</b>. Ábrelo desde este iPhone y vuelve aquí para entrar.
-          </p>
+          {confirmFor === 'signup' ? (
+            <p className="ob-sub center">
+              Te mandamos un enlace a <b>{email.trim()}</b>. Tócalo y vuelve aquí: entras solo. Si no aparece, mira en Spam o Promociones.
+            </p>
+          ) : (
+            <p className="ob-sub center">
+              Te mandamos un enlace a <b>{email.trim()}</b> para elegir una contraseña nueva. Después vuelve aquí y entra con ella.
+            </p>
+          )}
+          {errorLine}
           <div className="ob-actions">
-            <button className="ob-primary" onClick={() => go('login')}>
-              Ya lo abrí, entrar
-            </button>
+            {confirmFor === 'signup' ? (
+              <>
+                <button className="ob-primary" onClick={checkConfirmed} disabled={busy}>
+                  {busy ? 'Revisando…' : 'Ya lo confirmé'}
+                </button>
+                <button className={`ob-secondary ${resendIn > 0 ? 'muted' : ''}`} onClick={resend} disabled={busy || resendIn > 0}>
+                  {resendIn > 0 ? `Reenviar correo en ${resendIn} s` : 'Reenviar correo'}
+                </button>
+                <button
+                  className="ob-link"
+                  onClick={() => {
+                    setAsk('email')
+                    go('signup')
+                  }}
+                >
+                  Me equivoqué de correo
+                </button>
+              </>
+            ) : (
+              <button className="ob-primary" onClick={() => go('login')}>
+                Entrar
+              </button>
+            )}
           </div>
         </div>
       )}
