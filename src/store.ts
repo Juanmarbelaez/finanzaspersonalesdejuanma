@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Account, Category, Recurring, Settings, Transaction } from './lib/types'
 import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES, FALLBACK_CATEGORY, buildDemo } from './lib/seed'
-import { dueOccurrences } from './lib/recurring'
+import { clampISO, dueOccurrences, isISODate, skipPast } from './lib/recurring'
+import { sanitizeData } from './lib/sanitize'
 import { normalizeMerchant } from './lib/rules'
 import { currentMonth, todayISO } from './lib/dates'
 import { uid } from './lib/id'
@@ -41,7 +42,8 @@ interface Actions {
   deleteCategory(id: string): Undo
   upsertAccount(a: Account): void
   deleteAccount(id: string): Undo
-  upsertRecurring(r: Recurring): void
+  /** `fromToday`: no registra las fechas que ya pasaron. Al reanudar uno pausado siempre es así. */
+  upsertRecurring(r: Recurring, opts?: { fromToday?: boolean }): void
   deleteRecurring(id: string): Undo
   processRecurrings(today?: string): number
   setSettings(patch: Partial<Settings>): void
@@ -226,7 +228,12 @@ export const useStore = create<Data & Actions>()(
         }
       },
 
-      upsertRecurring(r) {
+      upsertRecurring(input, opts) {
+        const prev = get().recurrings.find((x) => x.id === input.id)
+        const nextDate = isISODate(clampISO(input.nextDate)) ? clampISO(input.nextDate) : (prev?.nextDate ?? todayISO())
+        let r: Recurring = { ...input, nextDate, anchorDay: Math.min(31, Math.max(1, Math.round(input.anchorDay) || 1)) }
+        // Reanudar no inventa los cobros de los meses en pausa
+        if (r.active && (opts?.fromToday || (prev && !prev.active))) r = { ...r, nextDate: skipPast(r, todayISO()) }
         set((s) => {
           const exists = s.recurrings.some((x) => x.id === r.id)
           return { recurrings: exists ? s.recurrings.map((x) => (x.id === r.id ? r : x)) : [...s.recurrings, r] }
@@ -283,7 +290,8 @@ export const useStore = create<Data & Actions>()(
       },
 
       restore(data) {
-        set({ ...initialData(), ...data, onboarded: true, demo: false })
+        // Viene de un archivo o de la nube: se limpia antes de entrar
+        set({ ...sanitizeData(data, initialData()), onboarded: true, demo: false })
       },
 
       resetAll() {
@@ -292,8 +300,11 @@ export const useStore = create<Data & Actions>()(
     }),
     {
       name: 'plata',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      // v1 → v2: fechas imposibles (31 de abril) y filas dañadas. La limpieza va en merge para que corra siempre al abrir.
+      migrate: (persisted) => persisted as Data,
+      merge: (persisted, current) => (persisted ? { ...current, ...sanitizeData(persisted, initialData()) } : current),
       partialize: (s): Data => ({
         onboarded: s.onboarded,
         demo: s.demo,

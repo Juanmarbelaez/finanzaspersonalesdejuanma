@@ -72,3 +72,46 @@ describe('borrar con deshacer', () => {
     expect(() => s().deleteCategory(FALLBACK_CATEGORY.expense)()).not.toThrow()
   })
 })
+
+describe('recurrentes', () => {
+  const base = () => ({
+    id: 'gym',
+    name: 'Gym',
+    amount: 100,
+    type: 'expense' as const,
+    categoryId: s().categories[0].id,
+    accountId: s().accounts[0].id,
+    frequency: 'monthly' as const,
+    anchorDay: 1,
+  })
+  const charges = () => s().transactions.filter((t) => t.recurringId === 'gym').length
+
+  it('reanudar uno pausado no inventa los cobros de la pausa', () => {
+    s().upsertRecurring({ ...base(), nextDate: '2020-01-01', active: false })
+    expect(charges()).toBe(0)
+    s().upsertRecurring({ ...s().recurrings.find((r) => r.id === 'gym')!, active: true })
+    expect(charges()).toBeLessThanOrEqual(1)
+    expect(s().recurrings.find((r) => r.id === 'gym')!.nextDate > '2020-01-01').toBe(true)
+  })
+
+  it('"solo desde hoy" no registra lo de atrás; por defecto sí', () => {
+    s().upsertRecurring({ ...base(), nextDate: '2020-01-01', active: true }, { fromToday: true })
+    expect(charges()).toBeLessThanOrEqual(1)
+    s().upsertRecurring({ ...base(), id: 'gym2', nextDate: '2026-01-01', active: true })
+    expect(s().transactions.filter((t) => t.recurringId === 'gym2').length).toBeGreaterThan(1)
+  })
+
+  it('una fecha imposible se guarda como el último día del mes', () => {
+    s().upsertRecurring({ ...base(), nextDate: '2099-04-31', anchorDay: 31, active: true })
+    expect(s().recurrings.find((r) => r.id === 'gym')!.nextDate).toBe('2099-04-30')
+  })
+})
+
+describe('restaurar', () => {
+  it('limpia el respaldo antes de usarlo', () => {
+    s().restore({ transactions: [{ id: 'x', date: 'mal' }], accounts: 'nada' } as never)
+    expect(s().transactions).toEqual([])
+    expect(s().accounts.length).toBeGreaterThan(0)
+    expect(s().onboarded).toBe(true)
+  })
+})

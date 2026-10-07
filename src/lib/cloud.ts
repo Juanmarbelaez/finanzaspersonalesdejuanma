@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { useStore, type Data } from '../store'
+import { sanitizeData } from './sanitize'
 
 /*
  * Cuentas en la nube (Supabase) con datos local-first:
@@ -67,7 +68,9 @@ export function snapshot(): Data {
 }
 
 /** Une dos versiones por id. Ante el mismo id gana la de este teléfono. */
-export function mergeData(local: Data, remote: Data): Data {
+export function mergeData(local: Data, rawRemote: Data): Data {
+  // Lo de la nube puede venir de otra versión de la app: se limpia antes de unir
+  const remote = sanitizeData(rawRemote, local)
   const byId = <T extends { id: string }>(a: T[], b: T[]) => {
     const map = new Map(b.map((x) => [x.id, x]))
     for (const x of a) map.set(x.id, x)

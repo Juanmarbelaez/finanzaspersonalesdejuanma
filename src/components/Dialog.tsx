@@ -9,15 +9,19 @@ import { haptic } from '../lib/haptic'
  * la dirección web como título y se sienten de página web.
  */
 
+type Choice = 'confirm' | 'alt' | 'cancel'
+
 interface Request {
   id: number
   kind: 'sheet' | 'alert'
   title?: string
   message?: string
   confirm: string
+  /** Segunda opción en la hoja de acciones (entre confirmar y cancelar) */
+  alt?: string
   cancel?: string
   destructive?: boolean
-  resolve(ok: boolean): void
+  resolve(choice: Choice): void
 }
 
 const useDialog = create<{ req: Request | null; closing: boolean }>(() => ({ req: null, closing: false }))
@@ -25,18 +29,18 @@ const useDialog = create<{ req: Request | null; closing: boolean }>(() => ({ req
 let seq = 0
 const EXIT_MS = 200
 
-function open(r: Omit<Request, 'id' | 'resolve'>): Promise<boolean> {
+function open(r: Omit<Request, 'id' | 'resolve'>): Promise<Choice> {
   return new Promise((resolve) => {
-    useDialog.getState().req?.resolve(false)
+    useDialog.getState().req?.resolve('cancel')
     useDialog.setState({ req: { ...r, id: ++seq, resolve }, closing: false })
   })
 }
 
-function finish(ok: boolean) {
+function finish(choice: Choice) {
   const { req, closing } = useDialog.getState()
   if (!req || closing) return
   useDialog.setState({ closing: true })
-  req.resolve(ok)
+  req.resolve(choice)
   setTimeout(() => {
     if (useDialog.getState().req?.id === req.id) useDialog.setState({ req: null, closing: false })
   }, EXIT_MS)
@@ -45,6 +49,11 @@ function finish(ok: boolean) {
 /** Hoja de acciones desde abajo. Resuelve `true` si confirma. */
 export function ask(o: { title?: string; message?: string; confirm: string; destructive?: boolean }): Promise<boolean> {
   if (o.destructive) haptic()
+  return open({ kind: 'sheet', cancel: 'Cancelar', ...o }).then((c) => c === 'confirm')
+}
+
+/** Hoja de acciones con dos caminos y cancelar. */
+export function choose(o: { title?: string; message?: string; confirm: string; alt: string }): Promise<Choice> {
   return open({ kind: 'sheet', cancel: 'Cancelar', ...o })
 }
 
@@ -65,7 +74,7 @@ export function DialogHost() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        finish(false)
+        finish('cancel')
       }
     }
     window.addEventListener('keydown', onKey, true)
@@ -77,7 +86,7 @@ export function DialogHost() {
 
   return createPortal(
     <>
-      <div className={`dialog-backdrop ${state}`} onClick={() => finish(false)} />
+      <div className={`dialog-backdrop ${state}`} onClick={() => finish('cancel')} />
       {req.kind === 'sheet' ? (
         <div
           className={`action-sheet ${state}`}
@@ -93,12 +102,13 @@ export function DialogHost() {
                 {req.message && <p id="dlg-msg">{req.message}</p>}
               </div>
             )}
-            <button className={req.destructive ? 'destructive' : ''} onClick={() => finish(true)}>
+            <button className={req.destructive ? 'destructive' : ''} onClick={() => finish('confirm')}>
               {req.confirm}
             </button>
+            {req.alt && <button onClick={() => finish('alt')}>{req.alt}</button>}
           </div>
           <div className="as-group">
-            <button ref={first} className="as-cancel" onClick={() => finish(false)}>
+            <button ref={first} className="as-cancel" onClick={() => finish('cancel')}>
               {req.cancel}
             </button>
           </div>
@@ -115,7 +125,7 @@ export function DialogHost() {
               </p>
             )}
           </div>
-          <button ref={first} onClick={() => finish(true)}>
+          <button ref={first} onClick={() => finish('confirm')}>
             {req.confirm}
           </button>
         </div>

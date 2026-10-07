@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { useStore, useUI } from '../store'
 import { useLocale, toast } from '../hooks'
-import { addMonths, parseISO, relativeDue, shortDate, todayISO } from '../lib/dates'
-import { FREQUENCY_LABEL, advance } from '../lib/recurring'
+import { parseISO, relativeDue, shortDate, todayISO } from '../lib/dates'
+import { FREQUENCY_LABEL, advance, dueOccurrences } from '../lib/recurring'
+import { choose } from '../components/Dialog'
 import { uid } from '../lib/id'
 import { haptic } from '../lib/haptic'
 import type { Frequency, Recurring } from '../lib/types'
@@ -13,8 +14,8 @@ import { TrendLine } from '../components/charts'
 import { TxRow } from '../components/TxRow'
 import { AccountCard, CatPill, Money, Segmented, Toggle } from '../components/ui'
 
-const PER_YEAR: Record<Frequency, number> = { weekly: 52, biweekly: 26, monthly: 12, yearly: 1 }
-const EVERY: Record<Frequency, string> = { weekly: 'cada semana', biweekly: 'cada quince días', monthly: 'cada mes', yearly: 'cada año' }
+const PER_YEAR: Record<Frequency, number> = { weekly: 52, biweekly: 24, monthly: 12, yearly: 1 }
+const EVERY: Record<Frequency, string> = { weekly: 'cada semana', biweekly: 'cada quincena', monthly: 'cada mes', yearly: 'cada año' }
 
 /* ---------------- Detalle ---------------- */
 
@@ -51,7 +52,14 @@ export function RecurringSheet({ id }: { id: string }) {
       footer={
         <div className="action-bar">
           <button onClick={() => openSheet({ name: 'recurringEdit', id })}>Editar</button>
-          <button onClick={() => upsertRecurring({ ...r, active: !r.active })}>{r.active ? 'Pausar' : 'Reanudar'}</button>
+          <button
+            onClick={() => {
+              upsertRecurring({ ...r, active: !r.active })
+              toast(r.active ? 'En pausa: no se registra nada hasta que lo reanudes' : 'Reanudado desde hoy')
+            }}
+          >
+            {r.active ? 'Pausar' : 'Reanudar'}
+          </button>
           <button className="danger" onClick={remove}>
             Borrar
           </button>
@@ -120,6 +128,7 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
   const accounts = useStore((s) => s.accounts)
   const { upsertRecurring, updateTransaction } = useStore.getState()
   const { closeSheet } = useUI.getState()
+  const locale = useLocale()
   const today = todayISO()
 
   const [type, setType] = useState<'expense' | 'income'>(existing?.type ?? (tx?.type === 'income' ? 'income' : 'expense'))
@@ -133,8 +142,7 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
   const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? 'monthly')
   // Por defecto: el próximo cobro es en un mes (o un mes después del movimiento de origen)
   const [nextDate, setNextDate] = useState(
-    existing?.nextDate ??
-      (tx ? advance(tx.date, 'monthly', Number(tx.date.slice(8, 10))) : `${addMonths(today.slice(0, 7), 1)}-${today.slice(8, 10)}`),
+    existing?.nextDate ?? advance(tx?.date ?? today, 'monthly', Number((tx?.date ?? today).slice(8, 10))),
   )
   const [active, setActive] = useState(existing?.active ?? true)
 
@@ -150,7 +158,7 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
     setError((e) => ({ field, msg, n: (e?.n ?? 0) + 1 }))
   }
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return fail('name', 'Ponle un nombre: Arriendo, Netflix…')
     if (!amount.value) return fail('amount', 'Escribe cuánto es')
     if (!categoryId) return fail('category', 'Elige una categoría')
@@ -167,7 +175,21 @@ export function RecurringEditSheet({ id, fromTx }: { id?: string; fromTx?: strin
       anchorDay: Number(nextDate.slice(8, 10)),
       active,
     }
-    upsertRecurring(r)
+    // Fecha en el pasado: decir cuántos cobros se van a crear antes de crearlos
+    // (al reanudar uno pausado nunca se cobra lo de atrás: lo hace el store)
+    const due = r.active && existing?.active !== false ? dueOccurrences(r, today).dates.length : 0
+    let fromToday = false
+    if (due > 1) {
+      const pick = await choose({
+        title: `Se van a registrar ${due} cobros`,
+        message: `Desde el ${shortDate(r.nextDate, locale)} hasta hoy. Si ya los anotaste a mano, mejor empieza desde hoy.`,
+        confirm: `Registrar los ${due}`,
+        alt: 'Solo desde hoy',
+      })
+      if (pick === 'cancel') return
+      fromToday = pick === 'alt'
+    }
+    upsertRecurring(r, { fromToday })
     if (tx) updateTransaction(tx.id, { recurringId: r.id })
     toast(existing ? 'Recurrente actualizado' : 'Recurrente creado')
     closeSheet()

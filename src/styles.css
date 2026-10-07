@@ -4232,3 +4232,12 @@ html.lg-refract .tabs .tab-lens {
 .tabs.lens-drag .tab-lens {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12));
 }
+
+/* Pantalla de rescate si algo se rompe al pintar */
+.rescue {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 18vh) 24px calc(env(safe-area-inset-bottom) + 24px);
+}

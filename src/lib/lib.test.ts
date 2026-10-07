@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { detectDateFormat, parseAmount, parseCSV, parseDate } from './csv'
-import { advance, dueOccurrences } from './recurring'
+import { advance, clampISO, dueOccurrences, isISODate, skipPast } from './recurring'
+import { sanitizeData } from './sanitize'
 import { suggestCategory } from './rules'
 import { accountBalances, budgetStatus, cumulativeDaily, groupByDay, totals } from './selectors'
 import { formatMoney } from './format'
@@ -76,7 +77,6 @@ describe('recurrentes', () => {
     expect(advance('2026-01-31', 'monthly', 31)).toBe('2026-02-28')
     expect(advance('2026-02-28', 'monthly', 31)).toBe('2026-03-31')
     expect(advance('2026-12-15', 'monthly', 15)).toBe('2027-01-15')
-    expect(advance('2026-10-01', 'biweekly', 1)).toBe('2026-10-15')
     expect(advance('2024-02-29', 'yearly', 29)).toBe('2025-02-28')
   })
 
@@ -168,5 +168,87 @@ describe('formatMoney', () => {
     expect(formatMoney(1234567, 'es-CO', 'COP')).toBe('$1.234.567')
     expect(formatMoney(-45000, 'es-CO', 'COP')).toBe('−$45.000')
     expect(formatMoney(45000, 'es-CO', 'COP', { sign: true })).toBe('+$45.000')
+  })
+
+  it('quincena: dos fechas fijas al mes, también en febrero', () => {
+    expect(advance('2026-10-15', 'biweekly', 15)).toBe('2026-10-30')
+    expect(advance('2026-10-30', 'biweekly', 30)).toBe('2026-11-15')
+    expect(advance('2026-02-15', 'biweekly', 15)).toBe('2026-02-28')
+    expect(advance('2026-02-28', 'biweekly', 30)).toBe('2026-03-15')
+    expect(advance('2026-10-01', 'biweekly', 1)).toBe('2026-10-16')
+    expect(advance('2026-04-30', 'biweekly', 31)).toBe('2026-05-16')
+  })
+
+  it('fechas imposibles se corrigen al último día del mes', () => {
+    expect(isISODate('2026-02-31')).toBe(false)
+    expect(isISODate('2026-02-28')).toBe(true)
+    expect(clampISO('2026-04-31')).toBe('2026-04-30')
+    expect(clampISO('2024-02-30')).toBe('2024-02-29')
+  })
+
+  it('saltar lo que ya pasó no registra nada atrás', () => {
+    const r: Recurring = {
+      id: 'r',
+      name: 'Gym',
+      amount: 1,
+      type: 'expense',
+      categoryId: 'c',
+      accountId: 'a',
+      frequency: 'monthly',
+      nextDate: '2026-05-31',
+      anchorDay: 31,
+      active: true,
+    }
+    expect(skipPast(r, '2026-10-07')).toBe('2026-10-31')
+    expect(skipPast(r, '2026-05-31')).toBe('2026-05-31')
+  })
+})
+
+describe('datos de afuera', () => {
+  const base = {
+    onboarded: false,
+    demo: false,
+    settings: { currency: 'COP', locale: 'es-CO', theme: 'dark' as const, name: '' },
+    accounts: [{ id: 'a', name: 'A', type: 'bank' as const, startingBalance: 0, color: '#000' }],
+    categories: [],
+    transactions: [],
+    recurrings: [],
+    merchantRules: {},
+  }
+
+  it('descarta filas dañadas sin perder las buenas', () => {
+    const out = sanitizeData(
+      {
+        onboarded: true,
+        transactions: [
+          {
+            id: '1',
+            date: '2026-10-01',
+            type: 'expense',
+            amount: 100,
+            name: 'Café',
+            categoryId: 'c',
+            accountId: 'a',
+            reviewed: true,
+            createdAt: 1,
+          },
+          { id: '2', date: 'ayer', type: 'expense', amount: 100, accountId: 'a' },
+          { id: '1', date: '2026-10-02', type: 'expense', amount: 5, accountId: 'a' },
+          null,
+          { id: '3', date: '2026-09-31', type: 'income', amount: '9', accountId: 'a' },
+        ],
+        recurrings: [{ id: 'r', nextDate: '2026-11-31', amount: 10, frequency: 'monthly', anchorDay: 31 }],
+      },
+      base,
+    )
+    expect(out.onboarded).toBe(true)
+    expect(out.transactions.map((t) => t.id)).toEqual(['1'])
+    expect(out.recurrings[0].nextDate).toBe('2026-11-30')
+    expect(out.accounts).toEqual(base.accounts)
+  })
+
+  it('un archivo cualquiera no rompe nada', () => {
+    expect(sanitizeData('hola', base).transactions).toEqual([])
+    expect(sanitizeData(null, base).settings.currency).toBe('COP')
   })
 })

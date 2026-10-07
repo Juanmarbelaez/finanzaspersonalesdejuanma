@@ -4,10 +4,13 @@ import '@fontsource-variable/montserrat/wght.css'
 import './styles.css'
 import { App } from './App'
 import { startHaptics } from './lib/haptic'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )
 
