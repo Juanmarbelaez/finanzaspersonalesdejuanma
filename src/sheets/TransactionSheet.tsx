@@ -6,7 +6,7 @@ import { addDays, monthKey, parseISO, shortDate, todayISO } from '../lib/dates'
 import { suggestCategory } from '../lib/rules'
 import { frequentMerchants, topCategories } from '../lib/suggest'
 import { FALLBACK_CATEGORY } from '../lib/seed'
-import { haptic } from '../lib/haptic'
+import { haptic, hapticSuccess } from '../lib/haptic'
 import { Sheet } from '../components/Sheet'
 import { AmountDisplay, Keypad, useAmount } from '../components/Keypad'
 import { AccountCard, CatPill, Money, Segmented } from '../components/ui'
@@ -121,7 +121,7 @@ export function TransactionSheet({ id, preset }: { id?: string; preset?: Partial
     }
     if (!accountId) return fail('Elige una cuenta')
     if (isTransfer && (!toAccountId || toAccountId === accountId)) return fail('Elige a qué cuenta va la plata')
-    haptic()
+    hapticSuccess()
     const cat = isTransfer ? null : (categoryId ?? FALLBACK_CATEGORY[kind])
     const input: TxInput = {
       type,

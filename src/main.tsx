@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/montserrat/wght.css'
 import './styles.css'
 import { App } from './App'
+import { startHaptics } from './lib/haptic'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -46,6 +47,8 @@ document.addEventListener('selectionchange', () => {
 // Refracción real del vidrio solo donde el navegador la soporta (Chrome/Edge en computador)
 if (/Chrome\//.test(navigator.userAgent) && !/Mobile|Android|CriOS|EdgiOS/.test(navigator.userAgent))
   document.documentElement.classList.add('lg-refract')
+
+startHaptics()
 
 // Funciona sin internet una vez instalada
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

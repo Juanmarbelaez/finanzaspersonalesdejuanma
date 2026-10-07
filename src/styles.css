@@ -3843,13 +3843,10 @@ body {
 
 /* ---------- La app hace scroll en su propio contenedor (sin rebote ni barra) ---------- */
 
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-}
-
 /*
+ * (Sin overflow: hidden en html/body: en iPhone recorta las hojas fijas abajo.
+ * No hace falta: todo el contenido vive en #root, que es fijo y tiene su propio scroll.)
+ *
  * El contenedor se sale 20 px por la derecha: el indicador de scroll de iOS queda fuera
  * de la pantalla (no se ve ni se puede agarrar). El padding devuelve ese espacio al contenido.
  */
@@ -4083,9 +4080,19 @@ label,
 /* Detrás de la hoja: los bordes de la pantalla encogida se desvanecen hacia el negro */
 .backdrop {
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.92) 0, rgba(0, 0, 0, 0) 140px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0, rgba(0, 0, 0, 0) 34px, rgba(0, 0, 0, 0) calc(100% - 34px), rgba(0, 0, 0, 0.9) 100%),
-    radial-gradient(130% 85% at 50% 40%, rgba(0, 0, 0, 0.38) 45%, rgba(0, 0, 0, 0.82) 100%);
+    linear-gradient(180deg, #000 0, rgba(0, 0, 0, 0.85) 60px, rgba(0, 0, 0, 0) 190px),
+    linear-gradient(
+      90deg,
+      #000 0,
+      #000 12px,
+      rgba(0, 0, 0, 0.6) 34px,
+      rgba(0, 0, 0, 0) 72px,
+      rgba(0, 0, 0, 0) calc(100% - 72px),
+      rgba(0, 0, 0, 0.6) calc(100% - 34px),
+      #000 calc(100% - 12px),
+      #000 100%
+    ),
+    radial-gradient(120% 80% at 50% 38%, rgba(0, 0, 0, 0.35) 40%, rgba(0, 0, 0, 0.88) 100%);
 }
 
 :root[data-theme='light'] .backdrop {
