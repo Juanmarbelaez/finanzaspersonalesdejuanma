@@ -65,7 +65,7 @@ export function Recurrings() {
     return (
       <div className="screen">
         <Empty
-          art={<Mascot pose="pointing" size={170} className="enter" />}
+          art={<Mascot pose="pointing" size={170} />}
           title="Tus pagos fijos"
           text="Agrega arriendo, servicios y suscripciones. Se anotan solos el día del cobro y te quedan por revisar."
         >

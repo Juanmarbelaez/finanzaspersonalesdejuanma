@@ -216,7 +216,7 @@ export function Welcome() {
       {step === 'intro' && (
         <div className="ob-step" key="intro">
           <div className="ob-hero">
-            <Mascot pose="welcome" size={150} className="ob-mascot enter" />
+            <Mascot pose="welcome" size={150} className="ob-mascot" />
             <h1 className="display">
               Tu plata,
               <br />
@@ -361,7 +361,7 @@ export function Welcome() {
 
       {step === 'confirm' && (
         <div className="ob-step" key="confirm">
-          <Mascot pose="pointing" size={180} className="ob-mascot center enter" />
+          <Mascot pose="pointing" size={180} className="ob-mascot center" />
           <h2 className="ob-title center">Revisa tu correo</h2>
           <p className="ob-sub center">
             Te mandamos un enlace a <b>{email.trim()}</b>. Ábrelo desde este iPhone y vuelve aquí para entrar.
@@ -458,7 +458,7 @@ export function Welcome() {
 
       {step === 'done' && (
         <div className="ob-step" key="done">
-          <Mascot pose="celebrate" size={220} className="ob-mascot center enter" />
+          <Mascot pose="celebrate" size={220} className="ob-mascot center" />
           <h2 className="ob-title center">Listo{displayName ? `, ${displayName}` : ''}.</h2>
           <p className="ob-sub center">Tu plata ya está guardada en tu cuenta. Anota tu primer gasto y mira cómo va el mes.</p>
           {isIOS() && !isStandalone() && (

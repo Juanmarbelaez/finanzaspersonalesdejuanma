@@ -105,7 +105,7 @@ export function Transactions() {
       {shown.length === 0 ? (
         filters.review ? (
           <Empty
-            art={<Mascot pose="review" size={170} className="enter" />}
+            art={<Mascot pose="review" size={170} />}
             title="Todo revisado"
             text="Lo que importes o se cobre solo (recurrentes) aparece aquí para que lo confirmes."
           />
@@ -117,7 +117,7 @@ export function Transactions() {
           </Empty>
         ) : (
           <Empty
-            art={<Mascot pose="empty" size={170} className="enter" />}
+            art={<Mascot pose="empty" size={170} />}
             title="Tu primer movimiento"
             text="Registra un gasto con el botón + o importa el extracto de tu banco en CSV."
           >
