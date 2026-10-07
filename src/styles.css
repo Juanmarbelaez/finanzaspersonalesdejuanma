@@ -3993,7 +3993,10 @@ html.lg-refract :is(.app-header .hbtn, .fab button:not(.primary), .tabs .tab-len
  * de mantener presionado, sin arrastrar imágenes ni zoom de doble toque.
  * ====================================================================== */
 
-body {
+/* En cada elemento (iOS no siempre lo hereda a los botones) */
+*,
+*::before,
+*::after {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -4001,7 +4004,9 @@ body {
 
 input,
 textarea,
-[contenteditable='true'] {
+[contenteditable='true'],
+input *,
+textarea * {
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;

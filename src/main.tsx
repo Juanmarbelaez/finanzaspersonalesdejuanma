@@ -30,8 +30,17 @@ setTimeout(() => {
 }, 1200)
 
 // Como app nativa: sin menú de "mantener presionado" fuera de los campos de texto
+const inField = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('input, textarea')
 document.addEventListener('contextmenu', (e) => {
-  if (!(e.target as HTMLElement).closest('input, textarea')) e.preventDefault()
+  if (!inField(e.target)) e.preventDefault()
+})
+// Si iOS igual empieza a seleccionar texto fuera de un campo, se cancela
+document.addEventListener('selectstart', (e) => {
+  if (!inField(e.target)) e.preventDefault()
+})
+document.addEventListener('selectionchange', () => {
+  const sel = getSelection()
+  if (sel && !sel.isCollapsed && !inField(document.activeElement) && !inField(sel.anchorNode?.parentElement ?? null)) sel.removeAllRanges()
 })
 
 // Refracción real del vidrio solo donde el navegador la soporta (Chrome/Edge en computador)
