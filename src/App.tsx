@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type TouchEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react'
 import { Check, FileUp, Plus, Settings2, SlidersHorizontal, X } from 'lucide-react'
 import { TABS, useStore, useUI, type Tab } from './store'
 import { useMonthMood, useResolvedTheme, useScrolled, useToast } from './hooks'
@@ -25,27 +25,146 @@ const SCREENS: Record<Tab, () => React.JSX.Element> = {
   accounts: Accounts,
 }
 
+/**
+ * Pestañas con una lente de vidrio que se desliza a la elegida.
+ * Si dejas el dedo un momento y deslizas, la lente te sigue y al soltar cambia de pestaña
+ * (como la barra de iOS 26). Un deslizamiento rápido sigue siendo scroll normal.
+ */
 function TabPills() {
   const tab = useUI((s) => s.tab)
   const setTab = useUI((s) => s.setTab)
   const ref = useRef<HTMLDivElement>(null)
+  const lens = useRef<HTMLSpanElement>(null)
+  const [hover, setHover] = useState<Tab | null>(null)
 
-  // La pestaña activa siempre queda a la vista, centrada
-  useEffect(() => {
-    const el = ref.current?.querySelector<HTMLButtonElement>('button.active')
-    el?.scrollIntoView({
-      inline: 'center',
-      block: 'nearest',
-      behavior: 'smooth',
-    })
+  const place = (btn: HTMLElement | null | undefined, dragX?: number) => {
+    const l = lens.current
+    if (!l || !btn) return
+    const x = dragX ?? btn.offsetLeft
+    l.style.transform = `translate(${x}px, ${btn.offsetTop}px)`
+    l.style.width = `${btn.offsetWidth}px`
+    l.style.height = `${btn.offsetHeight}px`
+  }
+
+  // La lente va a la pestaña activa y esa pestaña queda centrada a la vista
+  useLayoutEffect(() => {
+    const el = ref.current?.querySelector<HTMLButtonElement>(`button[data-tab="${tab}"]`)
+    place(el)
+    // Solo mueve la fila de pestañas (scrollIntoView también movía la pantalla)
+    const nav = ref.current
+    if (el && nav && nav.scrollWidth > nav.clientWidth)
+      nav.scrollTo({ left: el.offsetLeft - (nav.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' })
   }, [tab])
+
+  // Re-ubica la lente cuando carga la fuente o cambia el tamaño
+  useEffect(() => {
+    const re = () => place(ref.current?.querySelector<HTMLButtonElement>(`button[data-tab="${useUI.getState().tab}"]`))
+    document.fonts?.ready.then(re)
+    window.addEventListener('resize', re)
+    return () => window.removeEventListener('resize', re)
+  }, [])
+
+  // Mantener presionado y deslizar
+  useEffect(() => {
+    const nav = ref.current
+    if (!nav) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let dragging = false
+    let startX = 0
+    let startY = 0
+    let over: Tab | null = null
+
+    const buttonAt = (clientX: number) => {
+      const btns = [...nav.querySelectorAll<HTMLButtonElement>('button[data-tab]')]
+      return (
+        btns.find((b) => {
+          const r = b.getBoundingClientRect()
+          return clientX >= r.left - 2 && clientX <= r.right + 2
+        }) ?? null
+      )
+    }
+    const follow = (clientX: number) => {
+      const btn = buttonAt(clientX)
+      const l = lens.current
+      if (!l) return
+      const navRect = nav.getBoundingClientRect()
+      const w = l.offsetWidth
+      const x = clientX - navRect.left + nav.scrollLeft - w / 2
+      place(btn ?? nav.querySelector('button.active'), Math.max(0, x))
+      const id = (btn?.dataset.tab as Tab | undefined) ?? null
+      if (id && id !== over) {
+        over = id
+        haptic()
+        setHover(id)
+      }
+    }
+    const start = (x: number, y: number) => {
+      startX = x
+      startY = y
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        dragging = true
+        nav.classList.add('lens-drag')
+        haptic()
+        follow(startX)
+      }, 180)
+    }
+    const move = (x: number, y: number, e: Event) => {
+      if (dragging) {
+        if (e.cancelable) e.preventDefault()
+        follow(x)
+      } else if (Math.abs(x - startX) > 8 || Math.abs(y - startY) > 8) clearTimeout(timer)
+    }
+    const end = () => {
+      clearTimeout(timer)
+      if (!dragging) return
+      dragging = false
+      nav.classList.remove('lens-drag')
+      const id = over
+      over = null
+      setHover(null)
+      if (id) setTab(id)
+      else place(nav.querySelector<HTMLElement>('button.active'))
+      // El clic que llega después de soltar no debe repetir la acción
+      const stop = (ev: Event) => {
+        ev.stopPropagation()
+        ev.preventDefault()
+      }
+      nav.addEventListener('click', stop, { capture: true, once: true })
+      setTimeout(() => nav.removeEventListener('click', stop, { capture: true }), 50)
+    }
+    const ts = (e: globalThis.TouchEvent) => start(e.touches[0].clientX, e.touches[0].clientY)
+    const tm = (e: globalThis.TouchEvent) => move(e.touches[0].clientX, e.touches[0].clientY, e)
+    const pd = (e: PointerEvent) => e.pointerType === 'mouse' && start(e.clientX, e.clientY)
+    const pm = (e: PointerEvent) => e.pointerType === 'mouse' && e.buttons === 1 && move(e.clientX, e.clientY, e)
+    const pu = (e: PointerEvent) => e.pointerType === 'mouse' && end()
+    nav.addEventListener('touchstart', ts, { passive: true })
+    nav.addEventListener('touchmove', tm, { passive: false })
+    nav.addEventListener('touchend', end)
+    nav.addEventListener('touchcancel', end)
+    nav.addEventListener('pointerdown', pd)
+    window.addEventListener('pointermove', pm)
+    window.addEventListener('pointerup', pu)
+    return () => {
+      clearTimeout(timer)
+      nav.removeEventListener('touchstart', ts)
+      nav.removeEventListener('touchmove', tm)
+      nav.removeEventListener('touchend', end)
+      nav.removeEventListener('touchcancel', end)
+      nav.removeEventListener('pointerdown', pd)
+      window.removeEventListener('pointermove', pm)
+      window.removeEventListener('pointerup', pu)
+    }
+  }, [setTab])
 
   return (
     <nav className="tabs" ref={ref} aria-label="Secciones">
+      <span className="tab-lens glass" ref={lens} aria-hidden />
       {TABS.map((t) => (
         <button
           key={t.id}
-          className={tab === t.id ? 'active' : ''}
+          data-tab={t.id}
+          className={`${tab === t.id ? 'active' : ''} ${hover === t.id ? 'hover' : ''}`}
           aria-current={tab === t.id ? 'page' : undefined}
           onClick={() => setTab(t.id)}
         >
@@ -183,7 +302,7 @@ export function App() {
 
   useEffect(() => {
     scroller().scrollTo({ top: 0 })
-  }, [tab])
+  }, [tab, onboarded])
 
   if (!onboarded)
     return (

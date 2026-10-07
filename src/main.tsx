@@ -29,6 +29,15 @@ setTimeout(() => {
   }
 }, 1200)
 
+// Como app nativa: sin menú de "mantener presionado" fuera de los campos de texto
+document.addEventListener('contextmenu', (e) => {
+  if (!(e.target as HTMLElement).closest('input, textarea')) e.preventDefault()
+})
+
+// Refracción real del vidrio solo donde el navegador la soporta (Chrome/Edge en computador)
+if (/Chrome\//.test(navigator.userAgent) && !/Mobile|Android|CriOS|EdgiOS/.test(navigator.userAgent))
+  document.documentElement.classList.add('lg-refract')
+
 // Funciona sin internet una vez instalada
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

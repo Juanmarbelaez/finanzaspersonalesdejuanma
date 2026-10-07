@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import { DEFAULT_CATEGORIES } from '../lib/seed'
 import { isIOS, isStandalone } from '../lib/download'
 import { haptic } from '../lib/haptic'
+import { scroller } from '../lib/scroller'
 import { uid } from '../lib/id'
 import { explain, resetPassword, saveNow, signIn, signUp, useAuth } from '../lib/cloud'
 import type { Account } from '../lib/types'
@@ -20,7 +21,7 @@ import { Logo } from '../components/Logo'
  * - Errores que dicen cómo arreglarlo.
  */
 
-type Step = 'intro' | 'signup' | 'login' | 'forgot' | 'confirm' | 'accounts' | 'budget' | 'building' | 'done'
+type Step = 'intro' | 'install' | 'signup' | 'login' | 'forgot' | 'confirm' | 'accounts' | 'budget' | 'building' | 'done'
 type Ask = 'name' | 'hello' | 'email' | 'password'
 
 const PROGRESS: Partial<Record<Step, number>> = { signup: 1, login: 1, forgot: 1, confirm: 1, accounts: 2, budget: 3, building: 4, done: 4 }
@@ -113,6 +114,9 @@ export function Welcome() {
   const [step, setStep] = useState<Step>('intro')
   // Crear cuenta va de a una pregunta por pantalla (como Bevel)
   const [ask, setAsk] = useState<Ask>('name')
+  // En iPhone, antes de crear la cuenta se enseña a instalarla (abre a pantalla completa y sin Safari)
+  const needsInstall = isIOS() && !isStandalone()
+  const [after, setAfter] = useState<Step>('signup')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -133,6 +137,7 @@ export function Welcome() {
   const go = (s: Step) => {
     setError(null)
     setStep(s)
+    scroller().scrollTo({ top: 0 })
   }
 
   const validEmail = /^\S+@\S+\.\S+$/.test(email.trim())
@@ -242,6 +247,7 @@ export function Welcome() {
             <ArrowLeft size={20} />
           </button>
         )}
+        {step === 'install' && back('intro')}
         {['login', 'forgot', 'confirm'].includes(step) && back(step === 'forgot' ? 'login' : 'intro')}
         {step === 'budget' && back('accounts')}
         <Progress step={step} />
@@ -294,14 +300,61 @@ export function Welcome() {
             </li>
           </ul>
           <div className="ob-actions">
-            <button className="ob-primary" onClick={() => go('signup')}>
+            <button
+              className="ob-primary"
+              onClick={() => {
+                setAfter('signup')
+                go(needsInstall ? 'install' : 'signup')
+              }}
+            >
               Crear mi cuenta
             </button>
-            <button className="ob-secondary" onClick={() => go('login')}>
+            <button
+              className="ob-secondary"
+              onClick={() => {
+                setAfter('login')
+                go(needsInstall ? 'install' : 'login')
+              }}
+            >
               Ya tengo cuenta
             </button>
             <button className="ob-link" onClick={() => useStore.getState().start('demo')}>
               Mirar primero con datos de ejemplo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'install' && (
+        <div className="ob-step" key="install">
+          <div className="ob-center">
+            <Mascot pose="pointing" size={150} className="ob-mascot center" />
+            <h2 className="ob-title center">Primero, tenla como app</h2>
+            <p className="ob-sub center">Abre a pantalla completa, sin la barra de Safari, y la encuentras al lado de tus otras apps.</p>
+            <ol className="ob-install-steps">
+              <li>
+                <span className="n">1</span>
+                <span>
+                  Toca <Share size={17} /> <b>Compartir</b> abajo en Safari
+                </span>
+              </li>
+              <li>
+                <span className="n">2</span>
+                <span>
+                  Baja y elige <SquarePlus size={17} /> <b>Agregar a inicio</b>
+                </span>
+              </li>
+              <li>
+                <span className="n">3</span>
+                <span>
+                  Toca <b>Agregar</b> y ábrela desde tu pantalla de inicio
+                </span>
+              </li>
+            </ol>
+          </div>
+          <div className="ob-actions">
+            <button className="ob-link" onClick={() => go(after)}>
+              Seguir aquí en Safari
             </button>
           </div>
         </div>

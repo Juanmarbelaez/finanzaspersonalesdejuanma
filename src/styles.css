@@ -3849,22 +3849,224 @@ body {
   overflow: hidden;
 }
 
+/*
+ * El contenedor se sale 20 px por la derecha: el indicador de scroll de iOS queda fuera
+ * de la pantalla (no se ve ni se puede agarrar). El padding devuelve ese espacio al contenido.
+ */
 #root {
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: -20px;
+  padding-right: 20px;
   overflow-x: hidden;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior: none;
   scrollbar-width: none;
 }
 
 #root::-webkit-scrollbar {
   display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
 }
 
 /* Con el teclado abierto, el botón de seguir queda encima del teclado (como Uber) */
 .onboarding .ob-actions {
   padding-bottom: var(--kb, 0px);
   transition: padding-bottom 0.25s var(--ease-sheet);
+}
+
+/* ---------- Pestañas: lente de vidrio que se desliza (y te sigue al mantener presionado) ---------- */
+
+.tabs {
+  position: relative;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.tabs button {
+  position: relative;
+  z-index: 1;
+}
+
+.tabs button.active {
+  background: none;
+  box-shadow: none;
+}
+
+.tabs .tab-lens {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  transition:
+    transform 0.42s var(--ease-spring),
+    width 0.42s var(--ease-spring),
+    scale 0.25s var(--ease-spring);
+}
+
+/* Mientras lo arrastras, la lente se "levanta" y sigue al dedo sin retraso */
+.tabs.lens-drag .tab-lens {
+  transition:
+    transform 0.09s linear,
+    width 0.2s var(--ease-spring),
+    scale 0.25s var(--ease-spring);
+  scale: 1.12;
+}
+
+.tabs.lens-drag button.active:not(.hover) {
+  color: var(--h-fg-2);
+}
+
+.tabs button.hover {
+  color: var(--h-fg);
+}
+
+/* ======================================================================
+ * Liquid Glass, segunda pasada: más capas de luz y profundidad.
+ * Base para todos (Safari incluido) + refracción real donde el navegador la soporta.
+ * ====================================================================== */
+
+.glass,
+.app-header .hbtn,
+.sheet-top .corner,
+.fab button:not(.primary),
+.ob-back,
+.action-bar,
+.search,
+.toast {
+  -webkit-backdrop-filter: blur(14px) saturate(210%) brightness(1.08);
+  backdrop-filter: blur(14px) saturate(210%) brightness(1.08);
+  box-shadow:
+    /* brillo especular fino arriba */
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.42),
+    /* luz que entra por arriba */ inset 0 10px 16px -10px rgba(255, 255, 255, 0.22),
+    /* sombra interior abajo: le da grosor */ inset 0 -1px 1px rgba(0, 0, 0, 0.28),
+    inset 0 -8px 14px -10px rgba(0, 0, 0, 0.25),
+    /* sombra que lo separa del fondo */ 0 10px 28px -10px rgba(0, 0, 0, 0.6),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme='light'] :is(.glass, .app-header .hbtn, .sheet-top .corner, .fab button:not(.primary), .ob-back, .action-bar, .search) {
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.95),
+    inset 0 10px 16px -10px rgba(255, 255, 255, 0.7),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.06),
+    inset 0 -8px 14px -10px rgba(0, 0, 0, 0.08),
+    0 10px 28px -12px rgba(0, 0, 0, 0.22),
+    0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Al tocar, el vidrio crece y se ilumina un poco (como en iOS 26) */
+.app-header .hbtn,
+.sheet-top .corner,
+.fab button,
+.ob-back {
+  transition:
+    transform 0.4s var(--ease-spring),
+    filter 0.3s ease;
+}
+
+.app-header .hbtn:active,
+.sheet-top .corner:active,
+.fab button:active,
+.ob-back:active {
+  transform: scale(1.1);
+  filter: brightness(1.15);
+  transition-duration: 0.12s;
+}
+
+/* Refracción real (Chrome/Edge): el fondo se dobla en los bordes del vidrio */
+html.lg-refract :is(.app-header .hbtn, .fab button:not(.primary), .tabs .tab-lens, .sheet-top .corner) {
+  -webkit-backdrop-filter: url(#lg-lens) blur(10px) saturate(210%) brightness(1.08);
+  backdrop-filter: url(#lg-lens) blur(10px) saturate(210%) brightness(1.08);
+}
+
+/* ======================================================================
+ * Se siente instalada desde la App Store: sin selección de texto, sin menú
+ * de mantener presionado, sin arrastrar imágenes ni zoom de doble toque.
+ * ====================================================================== */
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+img,
+svg,
+a {
+  -webkit-user-drag: none;
+}
+
+button,
+a,
+input,
+label,
+.tx-row,
+.card,
+.sheet {
+  touch-action: manipulation;
+}
+
+/* Pasos para instalar: claros, numerados y con el ícono que van a ver en Safari */
+.ob-install-steps {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 6px 16px;
+  text-align: left;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 1px 0 var(--hl);
+}
+
+.ob-install-steps li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  font-size: 15px;
+  color: var(--text-body);
+  border-top: 0.5px solid var(--line);
+}
+
+.ob-install-steps li:first-child {
+  border-top: 0;
+}
+
+.ob-install-steps .n {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--tag-bg);
+  color: var(--text);
+}
+
+.ob-install-steps b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ob-install-steps svg {
+  vertical-align: -3px;
+  color: var(--accent-ink);
 }
