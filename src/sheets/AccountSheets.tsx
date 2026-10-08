@@ -102,8 +102,17 @@ export function AccountEditSheet({ id, type: presetType }: { id?: string; type?:
   const [name, setName] = useState(existing?.name ?? '')
   const [color, setColor] = useState(existing?.color ?? ACCOUNT_COLORS[0])
   const isCredit = type === 'credit'
+  // "Saldo de hoy" es el saldo real (inicial + movimientos), no el inicial.
+  // Al guardar se ajusta el inicial para que el de hoy quede como lo escribiste.
+  const moved = useMemo(() => {
+    if (!existing) return 0
+    const { transactions } = useStore.getState()
+    return (accountBalances([existing], transactions).get(existing.id) ?? 0) - existing.startingBalance
+  }, [existing])
+  const current = existing ? existing.startingBalance + moved : 0
   // En tarjetas se escribe la deuda en positivo y se guarda en negativo
-  const balance = useAmount(existing ? Math.abs(existing.startingBalance) || null : null)
+  const [shown] = useState(() => Math.abs(current))
+  const balance = useAmount(shown || null)
   const [pad, setPad] = useState(false)
   const [error, setError] = useState<{ msg: string; n: number } | null>(null)
 
@@ -115,12 +124,15 @@ export function AccountEditSheet({ id, type: presetType }: { id?: string; type?:
     }
     haptic()
     const amount = balance.value ?? 0
+    const today = isCredit ? -amount : amount
+    // Si no tocaste el saldo, el inicial queda igual (también si estaba en sobregiro)
+    const untouched = existing && amount === shown && (existing.type === 'credit') === isCredit
     upsertAccount({
       id: existing?.id ?? uid(),
       name: name.trim(),
       type,
       color,
-      startingBalance: isCredit ? -amount : amount,
+      startingBalance: untouched ? existing.startingBalance : today - moved,
     })
     toast(existing ? 'Cuenta actualizada' : 'Cuenta creada')
     closeSheet()
@@ -190,7 +202,9 @@ export function AccountEditSheet({ id, type: presetType }: { id?: string; type?:
           label={isCredit ? 'Deuda actual' : 'Saldo actual'}
         />
         <p className="caption" style={{ margin: '4px 0 0' }}>
-          Desde aquí la app suma y resta tus movimientos.
+          {existing && moved !== 0
+            ? 'Con todos tus movimientos. Si no cuadra con el banco, escribe el real y la app ajusta.'
+            : 'Desde aquí la app suma y resta tus movimientos.'}
         </p>
       </div>
 

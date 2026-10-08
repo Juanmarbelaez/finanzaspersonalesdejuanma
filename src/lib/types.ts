@@ -36,6 +36,8 @@ export interface Transaction {
   note?: string
   reviewed: boolean
   recurringId?: string
+  /** Huella de la fila del extracto de donde salió (para no duplicar al reimportar). */
+  importKey?: string
   createdAt: number
 }
 

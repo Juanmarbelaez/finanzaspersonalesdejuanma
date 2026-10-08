@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { detectDateFormat, parseAmount, parseCSV, parseDate } from './csv'
 import { advance, clampISO, dueOccurrences, isISODate, skipPast } from './recurring'
 import { sanitizeData } from './sanitize'
+import { isOwnTransfer, matchImport } from './importMatch'
 import { suggestCategory } from './rules'
 import { accountBalances, budgetStatus, cumulativeDaily, groupByDay, totals } from './selectors'
 import { formatMoney } from './format'
@@ -250,5 +251,53 @@ describe('datos de afuera', () => {
   it('un archivo cualquiera no rompe nada', () => {
     expect(sanitizeData('hola', base).transactions).toEqual([])
     expect(sanitizeData(null, base).settings.currency).toBe('COP')
+  })
+})
+
+describe('importar extractos', () => {
+  const tx = (o: Partial<Transaction>): Transaction => ({
+    id: Math.random().toString(36),
+    date: '2026-10-01',
+    type: 'expense',
+    amount: 44900,
+    name: 'Netflix',
+    categoryId: 'c',
+    accountId: 'a',
+    reviewed: true,
+    createdAt: 0,
+    ...o,
+  })
+  const row = (o: Partial<Transaction> = {}) => ({
+    date: '2026-10-02',
+    type: 'expense' as const,
+    amount: 44900,
+    name: 'NETFLIX.COM BOGOTA',
+    accountId: 'a',
+    ...o,
+  })
+
+  it('reconoce lo que anotaste a mano aunque el banco lo llame distinto y días después', () => {
+    expect(matchImport([tx({})], [row()]).isNew).toEqual([false])
+    expect(matchImport([tx({ date: '2026-09-20' })], [row()]).isNew).toEqual([true])
+    expect(matchImport([tx({ accountId: 'b' })], [row()]).isNew).toEqual([true])
+  })
+
+  it('una anotación a mano solo tapa una fila del extracto', () => {
+    expect(matchImport([tx({})], [row(), row({ date: '2026-10-03' })]).isNew).toEqual([false, true])
+  })
+
+  it('reimportar no duplica aunque hayas editado el movimiento', () => {
+    const first = matchImport([], [row(), row()])
+    expect(first.isNew).toEqual([true, true])
+    const imported = first.keys.map((k) => tx({ importKey: k, name: 'Netflix (editado)', date: '2026-10-15' }))
+    expect(matchImport(imported, [row(), row(), row({ amount: 1 })]).isNew).toEqual([false, false, true])
+  })
+
+  it('pagos de tarjeta y traslados propios no son gasto', () => {
+    expect(isOwnTransfer('PAGO TARJETA CREDITO VISA')).toBe(true)
+    expect(isOwnTransfer('Abono a TC Bancolombia')).toBe(true)
+    expect(isOwnTransfer('Traslado entre cuentas')).toBe(true)
+    expect(isOwnTransfer('PAGO PSE CLARO')).toBe(false)
+    expect(isOwnTransfer('Tarjeta de regalo Falabella')).toBe(false)
   })
 })

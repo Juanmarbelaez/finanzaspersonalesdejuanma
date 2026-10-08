@@ -9,6 +9,8 @@ import { FALLBACK_CATEGORY } from '../lib/seed'
 import { Sheet } from '../components/Sheet'
 import { AccountCard, Money, Segmented, Toggle } from '../components/ui'
 import { tell } from '../components/Dialog'
+import { isOwnTransfer, matchImport } from '../lib/importMatch'
+import { accountBalances } from '../lib/selectors'
 
 type AmountMode = 'single' | 'split'
 type Sign = 'negExpense' | 'posExpense'
@@ -36,6 +38,11 @@ export function ImportSheet() {
   const [sign, setSign] = useState<Sign>('negExpense')
   const [dateFormat, setDateFormat] = useState<DateFormat>('dmy')
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
+  const transactions = useStore((s) => s.transactions)
+  // Si la cuenta ya tiene saldo, lo normal es que ese saldo ya incluya lo del extracto
+  const balanceToday = useMemo(() => accountBalances(accounts, transactions).get(accountId) ?? 0, [accounts, transactions, accountId])
+  const [keepBalance, setKeepBalance] = useState<boolean | null>(null)
+  const keep = keepBalance ?? balanceToday !== 0
 
   const onFile = async (file: File | undefined) => {
     if (!file) return
@@ -109,14 +116,35 @@ export function ImportSheet() {
         return bad.push({ line, reason: `monto "${r[mode === 'single' ? amountCol : debitCol] ?? ''}" vacío o en cero` })
       const name = (r[descCol] ?? '').replace(/\s+/g, ' ').trim() || 'Movimiento'
       const type = value < 0 ? 'expense' : 'income'
+      // Pago de la tarjeta o traslado entre tus cuentas: sale de aquí pero no es gasto
+      if (type === 'expense' && isOwnTransfer(name)) {
+        const card = accounts.find((a) => a.type === 'credit' && a.id !== accountId)
+        ok.push({
+          date,
+          name,
+          amount: Math.abs(value),
+          type: 'transfer',
+          categoryId: null,
+          accountId,
+          ...(card && { toAccountId: card.id }),
+        })
+        return
+      }
       const cat = suggestCategory(name, rules, type === 'expense' ? expenseIds : incomeIds) ?? FALLBACK_CATEGORY[type]
       ok.push({ date, name, amount: Math.abs(value), type, categoryId: cat, accountId })
     })
     return { ok, bad }
-  }, [body, hasHeader, dateCol, descCol, amountCol, debitCol, creditCol, mode, sign, dateFormat, accountId, categories, rules])
+  }, [body, hasHeader, dateCol, descCol, amountCol, debitCol, creditCol, mode, sign, dateFormat, accountId, categories, rules, accounts])
+
+  const fresh = useMemo(() => {
+    const { isNew } = matchImport(transactions, parsed.ok)
+    return parsed.ok.filter((_, i) => isNew[i])
+  }, [transactions, parsed.ok])
+  const already = parsed.ok.length - fresh.length
+  const transfers = fresh.filter((t) => t.type === 'transfer').length
 
   const doImport = () => {
-    const { added, skipped } = importTransactions(parsed.ok)
+    const { added, skipped } = importTransactions(parsed.ok, { keepBalance: keep })
     toast(skipped ? `${added} nuevos · ${skipped} ya estaban` : `${added} movimientos importados`)
     setFilters({ review: true })
     setTab('transactions')
@@ -131,8 +159,8 @@ export function ImportSheet() {
       full
       footer={
         rows.length ? (
-          <button className="save-bar" onClick={doImport} disabled={!parsed.ok.length}>
-            Importar {parsed.ok.length} movimientos
+          <button className="save-bar" onClick={doImport} disabled={!fresh.length}>
+            {fresh.length ? `Importar ${fresh.length} movimientos` : 'Ya tienes todo esto'}
           </button>
         ) : undefined
       }
@@ -142,7 +170,7 @@ export function ImportSheet() {
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <p className="body">
             Descarga el extracto desde la app o web de tu banco en <b>CSV</b> y súbelo aquí. Los movimientos quedan <b>por revisar</b>, con
-            categoría sugerida, y si importas el mismo extracto dos veces no se duplican.
+            categoría sugerida, y no se duplica lo que ya tienes: ni el mismo extracto dos veces ni lo que anotaste a mano.
           </p>
           <button className="btn primary" style={{ marginTop: 16 }} onClick={() => fileRef.current?.click()}>
             <FileUp size={18} /> Elegir archivo
@@ -213,6 +241,42 @@ export function ImportSheet() {
             ))}
           </div>
 
+          <div className="list-group" style={{ marginTop: 14 }}>
+            <div className="kv">
+              <span className="k">Mantener el saldo de hoy</span>
+              <Toggle on={keep} onChange={setKeepBalance} label="Mantener saldo" />
+            </div>
+          </div>
+          <p className="caption" style={{ margin: '6px 4px 0' }}>
+            {keep ? (
+              <>
+                La cuenta sigue en <Money value={balanceToday} />: lo del extracto ya pasó por ahí y queda en tu historial.
+              </>
+            ) : (
+              'Cada movimiento suma o resta del saldo de la cuenta.'
+            )}
+          </p>
+
+          {(already > 0 || transfers > 0) && (
+            <div className="note" style={{ marginTop: 14 }}>
+              <span>
+                {already > 0 && (
+                  <>
+                    <b>{already} ya estaban</b> (de otro extracto o porque los anotaste a mano) y no se repiten.{' '}
+                  </>
+                )}
+                {transfers > 0 && (
+                  <>
+                    <b>
+                      {transfers} {transfers === 1 ? 'pago de tarjeta o traslado' : 'pagos de tarjeta o traslados'}
+                    </b>{' '}
+                    {transfers === 1 ? 'entra' : 'entran'} como transferencia, no como gasto.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           {parsed.bad.length > 0 && (
             <div className="note warn" style={{ marginTop: 14 }}>
               <span>
@@ -227,13 +291,13 @@ export function ImportSheet() {
           <div className="eyebrow gray group-title">Vista previa</div>
           <table className="preview">
             <tbody>
-              {parsed.ok.slice(0, 8).map((t, i) => (
+              {fresh.slice(0, 8).map((t, i) => (
                 <tr key={i}>
                   <td className="caption">{t.date.slice(5).split('-').reverse().join('/')}</td>
                   <td>
-                    <span style={{ letterSpacing: 0 }}>{catName(t.categoryId)?.emoji}</span> {t.name}
+                    <span style={{ letterSpacing: 0 }}>{t.type === 'transfer' ? '🔁' : catName(t.categoryId)?.emoji}</span> {t.name}
                   </td>
-                  <td className={t.type === 'income' ? 'pos' : ''}>
+                  <td className={t.type === 'income' ? 'pos' : t.type === 'transfer' ? 'muted' : ''}>
                     <Money value={t.amount} sign={t.type === 'income'} />
                   </td>
                 </tr>

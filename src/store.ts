@@ -4,6 +4,8 @@ import type { Account, Category, Recurring, Settings, Transaction } from './lib/
 import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES, FALLBACK_CATEGORY, buildDemo } from './lib/seed'
 import { clampISO, dueOccurrences, isISODate, skipPast } from './lib/recurring'
 import { sanitizeData } from './lib/sanitize'
+import { matchImport } from './lib/importMatch'
+import { accountBalances } from './lib/selectors'
 import { normalizeMerchant } from './lib/rules'
 import { currentMonth, todayISO } from './lib/dates'
 import { uid } from './lib/id'
@@ -36,7 +38,8 @@ interface Actions {
   /** Devuelve movimientos borrados (deshacer). */
   restoreTransactions(txs: Transaction[]): void
   setReviewed(ids: string[], reviewed?: boolean): void
-  importTransactions(rows: TxInput[]): { added: number; skipped: number }
+  /** `keepBalance`: el saldo de hoy de la cuenta no cambia (lo viejo ya estaba en el saldo que escribiste). */
+  importTransactions(rows: TxInput[], opts?: { keepBalance?: boolean }): { added: number; skipped: number }
   upsertCategory(c: Category): void
   /** Los borrados devuelven cómo deshacerlos (para el aviso con "Deshacer"). */
   deleteCategory(id: string): Undo
@@ -70,9 +73,6 @@ function learn(rules: Record<string, string>, t: Pick<Transaction, 'name' | 'cat
   if (!key || !t.categoryId || t.type === 'transfer' || rules[key] === t.categoryId) return rules
   return { ...rules, [key]: t.categoryId }
 }
-
-const dedupeKey = (t: Pick<Transaction, 'date' | 'amount' | 'type' | 'name' | 'accountId'>) =>
-  `${t.date}|${t.amount}|${t.type}|${normalizeMerchant(t.name)}|${t.accountId}`
 
 export const useStore = create<Data & Actions>()(
   persist(
@@ -135,29 +135,27 @@ export const useStore = create<Data & Actions>()(
         set((s) => ({ transactions: s.transactions.map((t) => (set_.has(t.id) ? { ...t, reviewed } : t)) }))
       },
 
-      importTransactions(rows) {
-        // Si el mismo extracto se importa dos veces, no duplicar.
-        // Se cuentan repeticiones para no perder dos compras iguales el mismo día.
-        const existing = new Map<string, number>()
-        for (const t of get().transactions) {
-          const k = dedupeKey(t)
-          existing.set(k, (existing.get(k) ?? 0) + 1)
-        }
+      importTransactions(rows, opts) {
+        // Ni lo del mismo extracto otra vez, ni lo que ya anotaste a mano o registró un recurrente
+        const { keys, isNew } = matchImport(get().transactions, rows)
         const now = Date.now()
         const added: Transaction[] = []
-        let skipped = 0
         rows.forEach((r, i) => {
-          const k = dedupeKey(r)
-          const left = existing.get(k) ?? 0
-          if (left > 0) {
-            existing.set(k, left - 1)
-            skipped++
-            return
-          }
-          added.push({ reviewed: false, ...r, id: uid(), createdAt: now - i })
+          if (isNew[i]) added.push({ reviewed: false, ...r, importKey: keys[i], id: uid(), createdAt: now - i })
         })
-        set((s) => ({ transactions: [...added, ...s.transactions] }))
-        return { added: added.length, skipped }
+        set((s) => {
+          let accounts = s.accounts
+          if (opts?.keepBalance && added.length) {
+            // Lo importado ya estaba dentro del saldo que escribiste: se descuenta del inicial de cada cuenta que toca
+            const after = accountBalances(s.accounts, added)
+            accounts = s.accounts.map((a) => {
+              const delta = (after.get(a.id) ?? a.startingBalance) - a.startingBalance
+              return delta ? { ...a, startingBalance: a.startingBalance - delta } : a
+            })
+          }
+          return { accounts, transactions: [...added, ...s.transactions] }
+        })
+        return { added: added.length, skipped: rows.length - added.length }
       },
 
       upsertCategory(c) {

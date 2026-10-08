@@ -63,6 +63,7 @@ export function cleanTransaction(o: Obj): Transaction | null {
   if (t.type === 'transfer' && typeof o.toAccountId === 'string') t.toAccountId = o.toAccountId
   if (typeof o.note === 'string' && o.note) t.note = o.note
   if (typeof o.recurringId === 'string') t.recurringId = o.recurringId
+  if (typeof o.importKey === 'string') t.importKey = o.importKey
   return t
 }
 

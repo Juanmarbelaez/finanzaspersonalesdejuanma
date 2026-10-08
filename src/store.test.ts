@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from './store'
 import { FALLBACK_CATEGORY } from './lib/seed'
+import { accountBalances } from './lib/selectors'
 
 const s = () => useStore.getState()
 
@@ -113,5 +114,26 @@ describe('restaurar', () => {
     expect(s().transactions).toEqual([])
     expect(s().accounts.length).toBeGreaterThan(0)
     expect(s().onboarded).toBe(true)
+  })
+})
+
+describe('importar y saldo de hoy', () => {
+  it('con "dejar el saldo de hoy" el saldo no se mueve', () => {
+    const acct = s().accounts[0].id
+    const before = accountBalances(s().accounts, s().transactions).get(acct)
+    s().importTransactions(
+      [{ date: '2020-01-05', type: 'expense', amount: 12345, name: 'Algo viejo', categoryId: null, accountId: acct }],
+      {
+        keepBalance: true,
+      },
+    )
+    expect(accountBalances(s().accounts, s().transactions).get(acct)).toBe(before)
+  })
+
+  it('sin la opción, el saldo cambia con lo importado', () => {
+    const acct = s().accounts[0].id
+    const before = accountBalances(s().accounts, s().transactions).get(acct)!
+    s().importTransactions([{ date: '2020-01-05', type: 'expense', amount: 12345, name: 'Algo viejo', categoryId: null, accountId: acct }])
+    expect(accountBalances(s().accounts, s().transactions).get(acct)).toBe(before - 12345)
   })
 })
